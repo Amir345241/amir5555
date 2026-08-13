@@ -34,6 +34,12 @@ COUNTRY_NAME, BET_AMOUNT, CLAN_NAME, DUEL_OPPONENT = range(4)
 # همون game.db کنار کد ساخته می‌شه (که با هر دیپلوی جدید روی Railway از بین می‌ره).
 DB_NAME = os.environ.get("DB_PATH", "game.db")
 
+# مطمئن می‌شیم پوشه‌ی مقصد (مثلاً /data روی Volume ریلوی) از قبل وجود داره،
+# وگرنه sqlite3.connect با ارور "unable to open database file" مواجه می‌شه.
+_db_dir = os.path.dirname(DB_NAME)
+if _db_dir:
+    os.makedirs(_db_dir, exist_ok=True)
+
 def db_connect():
     """اتصال استاندارد به دیتابیس با WAL mode و busy_timeout
     تا کوئری‌های همزمان (خصوصاً هنگام آپلود دیتابیس جدید) باعث قفل و کند شدن کل ربات نشوند."""
