@@ -12,9 +12,15 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, filters, ContextTypes
 
 # ========== توکن و تنظیمات ==========
-TOKEN = "8871565672:AAE47gxO-SG5UXz-zOozHbldNIiL7wSLfkQ"
-ADMIN_IDS = [7845464086]
-CHANNEL_ID = -1002157518380
+# روی Railway توکن را داخل کد نمی‌نویسیم؛ از Environment Variable خونده می‌شه (BOT_TOKEN).
+TOKEN = os.environ.get("BOT_TOKEN")
+if not TOKEN:
+    raise RuntimeError(
+        "❌ متغیر محیطی BOT_TOKEN تنظیم نشده! "
+        "توی Railway برو به تب Variables و BOT_TOKEN رو با توکن ربات‌ات اضافه کن."
+    )
+ADMIN_IDS = [int(x) for x in os.environ.get("ADMIN_IDS", "7845464086").split(",") if x.strip()]
+CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1002157518380"))
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,7 +29,16 @@ logger = logging.getLogger(__name__)
 COUNTRY_NAME, BET_AMOUNT, CLAN_NAME, DUEL_OPPONENT = range(4)
 
 # ========== دیتابیس ==========
-DB_NAME = "game.db"
+# اگر روی Railway یک Volume ساختی (مثلاً روی /data)، متغیر DB_PATH را روی
+# /data/game.db بذار تا دیتابیس بعد از هر ری‌دیپلوی پاک نشه. اگر چیزی ست نکنی،
+# همون game.db کنار کد ساخته می‌شه (که با هر دیپلوی جدید روی Railway از بین می‌ره).
+DB_NAME = os.environ.get("DB_PATH", "game.db")
+
+# مطمئن می‌شیم پوشه‌ی مقصد (مثلاً /data روی Volume ریلوی) از قبل وجود داره،
+# وگرنه sqlite3.connect با ارور "unable to open database file" مواجه می‌شه.
+_db_dir = os.path.dirname(DB_NAME)
+if _db_dir:
+    os.makedirs(_db_dir, exist_ok=True)
 
 def db_connect():
     """اتصال استاندارد به دیتابیس با WAL mode و busy_timeout
@@ -685,8 +700,8 @@ def build_admin_permissions_keyboard(target_id):
     keyboard = []
     for key, label in ADMIN_PERMISSIONS.items():
         mark = "✅" if key in perms else "❌"
-        keyboard.append([InlineKeyboardButton(f"{mark} {label}", style="primary", callback_data=f"admin_perm_toggle_{target_id}_{key}")])
-    keyboard.append([InlineKeyboardButton("🔙 پایان و بازگشت", style="primary", callback_data="admin_list_admins")])
+        keyboard.append([InlineKeyboardButton(f"{mark} {label}", callback_data=f"admin_perm_toggle_{target_id}_{key}")])
+    keyboard.append([InlineKeyboardButton("🔙 پایان و بازگشت", callback_data="admin_list_admins")])
     return InlineKeyboardMarkup(keyboard)
 
 def get_active_treasure():
@@ -800,8 +815,8 @@ def build_join_keyboard(not_joined):
     keyboard = []
     for ch in not_joined:
         link = ch.get("invite_link") or f"https://t.me/{str(ch['channel_id']).replace('@', '')}"
-        keyboard.append([InlineKeyboardButton(f"📢 {ch.get('channel_name', ch['channel_id'])}", style="primary", url=link)])
-    keyboard.append([InlineKeyboardButton("✅ عضو شدم", style="success", callback_data="check_membership")])
+        keyboard.append([InlineKeyboardButton(f"📢 {ch.get('channel_name', ch['channel_id'])}", url=link)])
+    keyboard.append([InlineKeyboardButton("✅ عضو شدم", callback_data="check_membership")])
     return InlineKeyboardMarkup(keyboard)
 
 async def enforce_channel_membership(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -919,84 +934,84 @@ def format_casualties(losses):
 # ========== دکمه‌های منوی دسته‌بندی‌شده ==========
 def get_main_menu(user):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🌍 کشور من", style="primary", callback_data="my_country"),
-         InlineKeyboardButton("🎲 پول رایگان", style="success", callback_data="free_money")],
-        [InlineKeyboardButton("🏛 سیاسی", style="primary", callback_data="political_menu"),
-         InlineKeyboardButton("💰 اقتصادی", style="primary", callback_data="economic_menu"),
-         InlineKeyboardButton("⚔️ نظامی", style="primary", callback_data="military_menu")],
-        [InlineKeyboardButton("🏰 کلن‌ها", style="primary", callback_data="clans"),
-         InlineKeyboardButton("📊 رتبه‌بندی", style="primary", callback_data="rankings"),
-         InlineKeyboardButton("🎁 هدیه روزانه", style="success", callback_data="daily_gift")],
-        [InlineKeyboardButton("🎯 ماموریت روزانه", style="primary", callback_data="daily_mission"),
-         InlineKeyboardButton("🎰 شرط‌بندی", style="primary", callback_data="betting"),
-         InlineKeyboardButton("⚔️ دوئل", style="danger", callback_data="duel")],
-        [InlineKeyboardButton("📈 بازار سهام", style="primary", callback_data="stock_market"),
-         InlineKeyboardButton("🗺️ شکار گنج", style="primary", callback_data="treasure_hunt"),
-         InlineKeyboardButton("⛏️ معدن‌کاوی", style="success", callback_data="mining")],
-        [InlineKeyboardButton("🎡 گردونه شانس", style="success", callback_data="lucky_wheel"),
-         InlineKeyboardButton("🏆 مسابقه گروهی", style="primary", callback_data="group_contest"),
-         InlineKeyboardButton("👥 دعوت دوستان", style="success", callback_data="referral")],
-        [InlineKeyboardButton("📰 روزنامه", style="primary", callback_data="newspaper"),
-         InlineKeyboardButton("🎪 تورنمنت", style="primary", callback_data="tournament"),
-         InlineKeyboardButton("🏅 دستاوردها", style="primary", callback_data="achievements")],
+        [InlineKeyboardButton("🌍 کشور من", callback_data="my_country"),
+         InlineKeyboardButton("🎲 پول رایگان", callback_data="free_money")],
+        [InlineKeyboardButton("🏛 سیاسی", callback_data="political_menu"),
+         InlineKeyboardButton("💰 اقتصادی", callback_data="economic_menu"),
+         InlineKeyboardButton("⚔️ نظامی", callback_data="military_menu")],
+        [InlineKeyboardButton("🏰 کلن‌ها", callback_data="clans"),
+         InlineKeyboardButton("📊 رتبه‌بندی", callback_data="rankings"),
+         InlineKeyboardButton("🎁 هدیه روزانه", callback_data="daily_gift")],
+        [InlineKeyboardButton("🎯 ماموریت روزانه", callback_data="daily_mission"),
+         InlineKeyboardButton("🎰 شرط‌بندی", callback_data="betting"),
+         InlineKeyboardButton("⚔️ دوئل", callback_data="duel")],
+        [InlineKeyboardButton("📈 بازار سهام", callback_data="stock_market"),
+         InlineKeyboardButton("🗺️ شکار گنج", callback_data="treasure_hunt"),
+         InlineKeyboardButton("⛏️ معدن‌کاوی", callback_data="mining")],
+        [InlineKeyboardButton("🎡 گردونه شانس", callback_data="lucky_wheel"),
+         InlineKeyboardButton("🏆 مسابقه گروهی", callback_data="group_contest"),
+         InlineKeyboardButton("👥 دعوت دوستان", callback_data="referral")],
+        [InlineKeyboardButton("📰 روزنامه", callback_data="newspaper"),
+         InlineKeyboardButton("🎪 تورنمنت", callback_data="tournament"),
+         InlineKeyboardButton("🏅 دستاوردها", callback_data="achievements")],
     ])
 
 def get_political_menu(user):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🤝 اتحاد", style="success", callback_data="alliance"),
-         InlineKeyboardButton("🏅 دیپلماسی", style="primary", callback_data="diplomacy")],
-        [InlineKeyboardButton("📢 بیانیه رسمی", style="primary", callback_data="official_statement"),
-         InlineKeyboardButton("📮 نظر کشورها", style="primary", callback_data="country_opinions")],
-        [InlineKeyboardButton("⚔️ قوانین جنگ", style="primary", callback_data="war_laws"),
-         InlineKeyboardButton("🏆 رتبه‌بندی‌ها", style="primary", callback_data="rankings")],
-        [InlineKeyboardButton("🌍 رویداد جهانی", style="primary", callback_data="world_events"),
-         InlineKeyboardButton("🕊️ گفتگوی محرمانه", style="primary", callback_data="secret_chat")],
-        [InlineKeyboardButton("🎖️ دستاوردها", style="primary", callback_data="achievements"),
-         InlineKeyboardButton("👥 زیرمجموعه‌گیری", style="success", callback_data="referral")],
-        [InlineKeyboardButton("🕊️ پیمان صلح", style="success", callback_data="peace_menu"),
-         InlineKeyboardButton("📋 وضعیت صلح", style="success", callback_data="peace_status")],
-        [InlineKeyboardButton("🔙 بازگشت به منو", style="primary", callback_data="menu")]
+        [InlineKeyboardButton("🤝 اتحاد", callback_data="alliance"),
+         InlineKeyboardButton("🏅 دیپلماسی", callback_data="diplomacy")],
+        [InlineKeyboardButton("📢 بیانیه رسمی", callback_data="official_statement"),
+         InlineKeyboardButton("📮 نظر کشورها", callback_data="country_opinions")],
+        [InlineKeyboardButton("⚔️ قوانین جنگ", callback_data="war_laws"),
+         InlineKeyboardButton("🏆 رتبه‌بندی‌ها", callback_data="rankings")],
+        [InlineKeyboardButton("🌍 رویداد جهانی", callback_data="world_events"),
+         InlineKeyboardButton("🕊️ گفتگوی محرمانه", callback_data="secret_chat")],
+        [InlineKeyboardButton("🎖️ دستاوردها", callback_data="achievements"),
+         InlineKeyboardButton("👥 زیرمجموعه‌گیری", callback_data="referral")],
+        [InlineKeyboardButton("🕊️ پیمان صلح", callback_data="peace_menu"),
+         InlineKeyboardButton("📋 وضعیت صلح", callback_data="peace_status")],
+        [InlineKeyboardButton("🔙 بازگشت به منو", callback_data="menu")]
     ])
 
 def get_economic_menu(user):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🏢 شرکت‌ها", style="primary", callback_data="companies"),
-         InlineKeyboardButton("📦 صادرات/واردات", style="primary", callback_data="trade")],
-        [InlineKeyboardButton("🛢️ نفت و انرژی", style="primary", callback_data="oil_energy"),
-         InlineKeyboardButton("🏦 بانک", style="primary", callback_data="bank_menu")],
-        [InlineKeyboardButton("🏴 بازار سیاه", style="danger", callback_data="black_market"),
-         InlineKeyboardButton("🏗️ پروژه‌های ملی", style="primary", callback_data="national_projects")],
-        [InlineKeyboardButton("💰 انتقال طلا", style="primary", callback_data="transfer_gold"),
-         InlineKeyboardButton("📈 بازار سهام", style="primary", callback_data="stock_market")],
-        [InlineKeyboardButton("🎟️ وارد کردن کوپن", style="primary", callback_data="enter_coupon")],
-        [InlineKeyboardButton("🔙 بازگشت به منو", style="primary", callback_data="menu")]
+        [InlineKeyboardButton("🏢 شرکت‌ها", callback_data="companies"),
+         InlineKeyboardButton("📦 صادرات/واردات", callback_data="trade")],
+        [InlineKeyboardButton("🛢️ نفت و انرژی", callback_data="oil_energy"),
+         InlineKeyboardButton("🏦 بانک", callback_data="bank_menu")],
+        [InlineKeyboardButton("🏴 بازار سیاه", callback_data="black_market"),
+         InlineKeyboardButton("🏗️ پروژه‌های ملی", callback_data="national_projects")],
+        [InlineKeyboardButton("💰 انتقال طلا", callback_data="transfer_gold"),
+         InlineKeyboardButton("📈 بازار سهام", callback_data="stock_market")],
+        [InlineKeyboardButton("🎟️ وارد کردن کوپن", callback_data="enter_coupon")],
+        [InlineKeyboardButton("🔙 بازگشت به منو", callback_data="menu")]
     ])
 
 def get_military_menu(user):
     keyboard = [
-        [InlineKeyboardButton("🔫 بازار تسلیحات", style="primary", callback_data="arms_market"),
-         InlineKeyboardButton("💣 حمله", style="danger", callback_data="attack_menu")],
-        [InlineKeyboardButton("🤝 معامله تسلیحات", style="primary", callback_data="arms_deal"),
-         InlineKeyboardButton("🎯 حمله گروهی", style="danger", callback_data="group_attack_menu")],
-        [InlineKeyboardButton("☢️ حمله اتمی", style="danger", callback_data="nuke_attack"),
-         InlineKeyboardButton("🕵️ جاسوسی", style="danger", callback_data="spy")],
-        [InlineKeyboardButton("💣 خرابکاری هسته‌ای", style="danger", callback_data="nuclear_sabotage"),
-         InlineKeyboardButton("🕶️ امنیت و ترور", style="danger", callback_data="security_terror")],
-        [InlineKeyboardButton("🧪 دانشمندان هسته‌ای", style="primary", callback_data="nuke_scientists_menu"),
-         InlineKeyboardButton("🏭 کارخانه هسته‌ای", style="primary", callback_data="nuke_factory_menu")],
-        [InlineKeyboardButton("🗺️ نقشه جنگی", style="primary", callback_data="war_map"),
-         InlineKeyboardButton("🛡️ سپر دفاعی", style="primary", callback_data="shield_buy")],
-        [InlineKeyboardButton("🔙 بازگشت به منو", style="primary", callback_data="menu")]
+        [InlineKeyboardButton("🔫 بازار تسلیحات", callback_data="arms_market"),
+         InlineKeyboardButton("💣 حمله", callback_data="attack_menu")],
+        [InlineKeyboardButton("🤝 معامله تسلیحات", callback_data="arms_deal"),
+         InlineKeyboardButton("🎯 حمله گروهی", callback_data="group_attack_menu")],
+        [InlineKeyboardButton("☢️ حمله اتمی", callback_data="nuke_attack"),
+         InlineKeyboardButton("🕵️ جاسوسی", callback_data="spy")],
+        [InlineKeyboardButton("💣 خرابکاری هسته‌ای", callback_data="nuclear_sabotage"),
+         InlineKeyboardButton("🕶️ امنیت و ترور", callback_data="security_terror")],
+        [InlineKeyboardButton("🧪 دانشمندان هسته‌ای", callback_data="nuke_scientists_menu"),
+         InlineKeyboardButton("🏭 کارخانه هسته‌ای", callback_data="nuke_factory_menu")],
+        [InlineKeyboardButton("🗺️ نقشه جنگی", callback_data="war_map"),
+         InlineKeyboardButton("🛡️ سپر دفاعی", callback_data="shield_buy")],
+        [InlineKeyboardButton("🔙 بازگشت به منو", callback_data="menu")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 def get_attack_menu(user):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("⚔️ حمله به NPC", style="danger", callback_data="military_attack"),
-         InlineKeyboardButton("⚔️ حمله به کاربر", style="danger", callback_data="attack_user")],
-        [InlineKeyboardButton("🛡️ خرید سپر دفاعی", style="success", callback_data="shield_buy"),
-         InlineKeyboardButton("📋 حملات در راه", style="primary", callback_data="pending_attacks")],
-        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")]
+        [InlineKeyboardButton("⚔️ حمله به NPC", callback_data="military_attack"),
+         InlineKeyboardButton("⚔️ حمله به کاربر", callback_data="attack_user")],
+        [InlineKeyboardButton("🛡️ خرید سپر دفاعی", callback_data="shield_buy"),
+         InlineKeyboardButton("📋 حملات در راه", callback_data="pending_attacks")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="military_menu")]
     ])
 
 # ========== شروع /start ==========
@@ -1223,7 +1238,7 @@ async def my_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"• 💻 حملات سایبری: {user.get('cyber_attacks', 0)}\n"
         )
 
-    keyboard = [[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]]
+    keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]]
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ========== بازار تسلیحات (۳۰ سلاح جدید) ==========
@@ -1244,12 +1259,12 @@ async def arms_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if i + j < len(off_keys):
                 key = off_keys[i+j]
                 info = OFFENSIVE_EQUIPMENT[key]
-                row.append(InlineKeyboardButton(f"{info['name']} ({info['price']:,} طلا)", style="primary", callback_data=f"buy_{key}"))
+                row.append(InlineKeyboardButton(f"{info['name']} ({info['price']:,} طلا)", callback_data=f"buy_{key}"))
         if row:
             keyboard.append(row)
 
-    keyboard.append([InlineKeyboardButton("➡️ سلاح‌های دفاعی", style="primary", callback_data="defense_market")])
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")])
+    keyboard.append([InlineKeyboardButton("➡️ سلاح‌های دفاعی", callback_data="defense_market")])
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="military_menu")])
 
     text = f"🛒 بازار تسلیحات جنگی\n💰 طلا: {user['gold']:,}\n\n📋 سلاح‌های تهاجمی:"
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -1270,12 +1285,12 @@ async def defense_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if i + j < len(def_keys):
                 key = def_keys[i+j]
                 info = DEFENSIVE_EQUIPMENT[key]
-                row.append(InlineKeyboardButton(f"{info['name']} ({info['price']:,} طلا)", style="primary", callback_data=f"buy_{key}"))
+                row.append(InlineKeyboardButton(f"{info['name']} ({info['price']:,} طلا)", callback_data=f"buy_{key}"))
         if row:
             keyboard.append(row)
 
-    keyboard.append([InlineKeyboardButton("⬅️ سلاح‌های جنگی", style="primary", callback_data="arms_market")])
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")])
+    keyboard.append([InlineKeyboardButton("⬅️ سلاح‌های جنگی", callback_data="arms_market")])
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="military_menu")])
 
     text = f"🛒 بازار تسلیحات دفاعی\n💰 طلا: {user['gold']:,}\n\n📋 سلاح‌های دفاعی:"
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -1306,7 +1321,7 @@ async def buy_equipment(update: Update, context: ContextTypes.DEFAULT_TYPE, item
     await query.answer(f"✅ {info['name']} خریداری شد!", show_alert=True)
     await query.edit_message_text(
         f"✅ {info['name']} با موفقیت خریداری شد!\n💰 طلای باقی‌مانده: {new_gold:,}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به بازار", style="primary", callback_data="arms_market")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به بازار", callback_data="arms_market")]])
     )
 
 # ========== سپر دفاعی ==========
@@ -1336,7 +1351,7 @@ async def shield_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ شما به مدت ۱ ساعت در برابر حملات مصون هستید.\n"
         f"💰 پرداخت: {SHIELD_PRICE:,} طلا\n"
         f"💰 طلای باقی‌مانده: {new_gold:,}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="military_menu")]])
     )
 
 # ========== حمله با تأخیر و هشدار ==========
@@ -1370,13 +1385,13 @@ async def attack_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Check peace treaty
         if has_peace_treaty(user_id, u["user_id"]):
             continue
-        row.append(InlineKeyboardButton(f"🏳️ {u['name']}", style="danger", callback_data=f"attack_user_{u['user_id']}"))
+        row.append(InlineKeyboardButton(f"🏳️ {u['name']}", callback_data=f"attack_user_{u['user_id']}"))
         if len(row) == 2:
             keyboard.append(row)
             row = []
     if row:
         keyboard.append(row)
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="attack_menu")])
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="attack_menu")])
 
     await query.edit_message_text(
         f"⚔️ حمله به کاربر\n🎯 کاربر هدف را انتخاب کنید:\n\n⚠️ کاربران دارای پیمان صلح نمایش داده نمی‌شوند.",
@@ -1399,12 +1414,12 @@ async def select_attack_percent(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data['attack_target'] = target_user_id
 
     keyboard = [
-        [InlineKeyboardButton("۱۰%", style="primary", callback_data="attack_pct_10"), InlineKeyboardButton("۲۰%", style="primary", callback_data="attack_pct_20")],
-        [InlineKeyboardButton("۳۰%", style="primary", callback_data="attack_pct_30"), InlineKeyboardButton("۴۰%", style="primary", callback_data="attack_pct_40")],
-        [InlineKeyboardButton("۵۰%", style="primary", callback_data="attack_pct_50"), InlineKeyboardButton("۶۰%", style="primary", callback_data="attack_pct_60")],
-        [InlineKeyboardButton("۷۰%", style="primary", callback_data="attack_pct_70"), InlineKeyboardButton("۸۰%", style="primary", callback_data="attack_pct_80")],
-        [InlineKeyboardButton("۹۰%", style="primary", callback_data="attack_pct_90"), InlineKeyboardButton("۱۰۰%", style="primary", callback_data="attack_pct_100")],
-        [InlineKeyboardButton("❌ انصراف", style="primary", callback_data="attack_menu")]
+        [InlineKeyboardButton("۱۰%", callback_data="attack_pct_10"), InlineKeyboardButton("۲۰%", callback_data="attack_pct_20")],
+        [InlineKeyboardButton("۳۰%", callback_data="attack_pct_30"), InlineKeyboardButton("۴۰%", callback_data="attack_pct_40")],
+        [InlineKeyboardButton("۵۰%", callback_data="attack_pct_50"), InlineKeyboardButton("۶۰%", callback_data="attack_pct_60")],
+        [InlineKeyboardButton("۷۰%", callback_data="attack_pct_70"), InlineKeyboardButton("۸۰%", callback_data="attack_pct_80")],
+        [InlineKeyboardButton("۹۰%", callback_data="attack_pct_90"), InlineKeyboardButton("۱۰۰%", callback_data="attack_pct_100")],
+        [InlineKeyboardButton("❌ انصراف", callback_data="attack_menu")]
     ]
     await query.edit_message_text(
         f"🎯 حمله به {target['country_name']}\n"
@@ -1445,10 +1460,10 @@ async def execute_attack_warning(update: Update, context: ContextTypes.DEFAULT_T
         f"فرصت دارید واکنش نشون بدید:"
     )
     warning_keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🛡️ خرید سپر دفاعی (۵,۰۰۰,۰۰۰ طلا)", style="success", callback_data=f"defense_shield_{attack_id}")],
-        [InlineKeyboardButton("🕵️ جاسوسی سریع", style="danger", callback_data=f"defense_spy_{attack_id}")],
-        [InlineKeyboardButton("⚔️ ضدحمله", style="danger", callback_data=f"defense_counter_{attack_id}")],
-        [InlineKeyboardButton("⏳ عدم اقدام", style="primary", callback_data=f"defense_wait_{attack_id}")]
+        [InlineKeyboardButton("🛡️ خرید سپر دفاعی (۵,۰۰۰,۰۰۰ طلا)", callback_data=f"defense_shield_{attack_id}")],
+        [InlineKeyboardButton("🕵️ جاسوسی سریع", callback_data=f"defense_spy_{attack_id}")],
+        [InlineKeyboardButton("⚔️ ضدحمله", callback_data=f"defense_counter_{attack_id}")],
+        [InlineKeyboardButton("⏳ عدم اقدام", callback_data=f"defense_wait_{attack_id}")]
     ])
 
     try:
@@ -1465,7 +1480,7 @@ async def execute_attack_warning(update: Update, context: ContextTypes.DEFAULT_T
         f"⏳ زمان رسیدن: {format_time_remaining(travel_time)}\n"
         f"🆔 کد عملیات: #{attack_id}\n\n"
         f"منتظر نتیجه باشید...",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]])
     )
 
     # Schedule delayed resolution
@@ -1744,9 +1759,9 @@ async def peace_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     keyboard = [
-        [InlineKeyboardButton("🕊️ ارائه پیمان صلح", style="success", callback_data="peace_offer")],
-        [InlineKeyboardButton("📋 دریافت‌های صلح", style="success", callback_data="peace_inbox")],
-        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="political_menu")]
+        [InlineKeyboardButton("🕊️ ارائه پیمان صلح", callback_data="peace_offer")],
+        [InlineKeyboardButton("📋 دریافت‌های صلح", callback_data="peace_inbox")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="political_menu")]
     ]
     await query.edit_message_text(
         f"🕊️ پیمان صلح\n"
@@ -1761,7 +1776,7 @@ async def peace_offer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     await query.edit_message_text(
         "🕊️ آیدی عددی کشور مورد نظر برای پیمان صلح را وارد کنید:",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="peace_menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="peace_menu")]])
     )
     context.user_data['waiting_for'] = 'peace_offer'
 
@@ -1775,7 +1790,7 @@ async def peace_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not offers:
         await query.edit_message_text(
             "📭 هیچ پیشنهاد صلحی وجود ندارد.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="peace_menu")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="peace_menu")]])
         )
         return
 
@@ -1784,10 +1799,10 @@ async def peace_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for sender_id, sender_name in list(offers.items()):
         text += f"• {sender_name}\n"
         keyboard.append([
-            InlineKeyboardButton(f"✅ قبول {sender_name}", style="primary", callback_data=f"peace_accept_{sender_id}"),
-            InlineKeyboardButton(f"❌ رد {sender_name}", style="primary", callback_data=f"peace_reject_{sender_id}")
+            InlineKeyboardButton(f"✅ قبول {sender_name}", callback_data=f"peace_accept_{sender_id}"),
+            InlineKeyboardButton(f"❌ رد {sender_name}", callback_data=f"peace_reject_{sender_id}")
         ])
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="peace_menu")])
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="peace_menu")])
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def peace_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1805,7 +1820,7 @@ async def peace_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not rows:
         await query.edit_message_text(
             "🕊️ شما هیچ پیمان صلح فعالی ندارید.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="political_menu")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="political_menu")]])
         )
         return
 
@@ -1817,7 +1832,7 @@ async def peace_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         remaining = row[2] - now
         text += f"• {other_name} - {format_time_remaining(remaining)} باقی‌مانده\n"
 
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="political_menu")]]))
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="political_menu")]]))
 
 async def peace_accept(update: Update, context: ContextTypes.DEFAULT_TYPE, sender_id):
     query = update.callback_query
@@ -1878,9 +1893,9 @@ async def diplomacy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"• امکانات تجاری دریافت کنید\n"
         f"• از حملات پیشگیری کنید",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🤝 ایجاد اتحاد", style="success", callback_data="alliance")],
-            [InlineKeyboardButton("📨 ارسال پیام دیپلماتیک", style="primary", callback_data="diplomacy_msg")],
-            [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="political_menu")]
+            [InlineKeyboardButton("🤝 ایجاد اتحاد", callback_data="alliance")],
+            [InlineKeyboardButton("📨 ارسال پیام دیپلماتیک", callback_data="diplomacy_msg")],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data="political_menu")]
         ])
     )
 
@@ -1890,7 +1905,7 @@ async def official_statement(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.edit_message_text(
         "📢 متن بیانیه رسمی خود را وارد کنید:\n"
         "(این پیام برای همه کاربران ارسال خواهد شد)",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="political_menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="political_menu")]])
     )
     context.user_data['waiting_for'] = 'official_statement'
 
@@ -1912,8 +1927,8 @@ async def country_opinions(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += "• هیچ بیانیه‌ای ثبت نشده\n"
 
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([
-        [InlineKeyboardButton("📢 ثبت بیانیه", style="success", callback_data="official_statement")],
-        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="political_menu")]
+        [InlineKeyboardButton("📢 ثبت بیانیه", callback_data="official_statement")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="political_menu")]
     ]))
 
 async def war_laws(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1931,7 +1946,7 @@ async def war_laws(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "۷. هرگونه تقلب در شرط‌بندی جرم جنگی محسوب می‌شود"
     )
     await query.edit_message_text(laws, reply_markup=InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="political_menu")]
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="political_menu")]
     ]))
 
 async def world_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1954,7 +1969,7 @@ async def world_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += "• هیچ رویداد فعالی وجود ندارد\n"
 
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="political_menu")]
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="political_menu")]
     ]))
 
 async def secret_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1966,7 +1981,7 @@ async def secret_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📨 برای ارسال پیام محرمانه، فرمت زیر را وارد کنید:\n"
         "آیدی_عددی | متن پیام\n"
         "مثال: 123456789 | پیام محرمانه شما...",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="political_menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="political_menu")]])
     )
     context.user_data['waiting_for'] = 'secret_chat'
 
@@ -1988,10 +2003,10 @@ async def bank_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💡 سپرده‌گذاری در بانک از غارت حملات محافظت می‌کند!\n\n"
         f"📋 انتخاب کنید:",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("💰 واریز به بانک", style="success", callback_data="bank_deposit"),
-             InlineKeyboardButton("💸 برداشت از بانک", style="primary", callback_data="bank_withdraw")],
-            [InlineKeyboardButton("📈 دریافت سود", style="success", callback_data="bank_interest")],
-            [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="economic_menu")]
+            [InlineKeyboardButton("💰 واریز به بانک", callback_data="bank_deposit"),
+             InlineKeyboardButton("💸 برداشت از بانک", callback_data="bank_withdraw")],
+            [InlineKeyboardButton("📈 دریافت سود", callback_data="bank_interest")],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data="economic_menu")]
         ])
     )
 
@@ -2000,7 +2015,7 @@ async def bank_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     await query.edit_message_text(
         "💰 مقدار طلا برای واریز به بانک را وارد کنید:",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="bank_menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="bank_menu")]])
     )
     context.user_data['waiting_for'] = 'bank_deposit'
 
@@ -2009,7 +2024,7 @@ async def bank_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     await query.edit_message_text(
         "💸 مقدار طلا برای برداشت از بانک را وارد کنید:",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="bank_menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="bank_menu")]])
     )
     context.user_data['waiting_for'] = 'bank_withdraw'
 
@@ -2029,7 +2044,7 @@ async def bank_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"💰 سود: {interest:,} طلا\n"
         f"🏦 موجودی بانک: {new_bank:,}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="bank_menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="bank_menu")]])
     )
 
 # ========== اقتصادی - شرکت‌ها ==========
@@ -2048,9 +2063,9 @@ async def companies(update: Update, context: ContextTypes.DEFAULT_TYPE):
     income = user["economy"] * 50
 
     keyboard = [
-        [InlineKeyboardButton(f"💰 دریافت درآمد ({income:,} طلا)", style="success", callback_data="company_collect")] if can_collect else [],
-        [InlineKeyboardButton("🏭 ارتقای اقتصاد", style="success", callback_data="national_projects")],
-        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="economic_menu")]
+        [InlineKeyboardButton(f"💰 دریافت درآمد ({income:,} طلا)", callback_data="company_collect")] if can_collect else [],
+        [InlineKeyboardButton("🏭 ارتقای اقتصاد", callback_data="national_projects")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="economic_menu")]
     ]
     keyboard = [k for k in keyboard if k]
 
@@ -2084,7 +2099,7 @@ async def company_collect(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"✅ {income:,} طلا دریافت شد!\n"
         f"💰 موجودی جدید: {user['gold'] + income:,}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="companies")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="companies")]])
     )
 
 # ========== اقتصادی - صادرات/واردات ==========
@@ -2109,10 +2124,10 @@ async def trade(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🛢️ نفت شما: {user['oil']:,}\n\n"
         f"📋 انتخاب کنید:",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton(f"🛢️ فروش ۱۰۰ نفت ({100*oil_price:,} طلا)", style="primary", callback_data="trade_sell_100")],
-            [InlineKeyboardButton(f"🛢️ فروش ۵۰۰ نفت ({500*oil_price:,} طلا)", style="primary", callback_data="trade_sell_500")],
-            [InlineKeyboardButton(f"💰 خرید ۱۰۰ نفت ({int(100/gold_price*100):,} طلا)", style="success", callback_data="trade_buy_100")],
-            [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="economic_menu")]
+            [InlineKeyboardButton(f"🛢️ فروش ۱۰۰ نفت ({100*oil_price:,} طلا)", callback_data="trade_sell_100")],
+            [InlineKeyboardButton(f"🛢️ فروش ۵۰۰ نفت ({500*oil_price:,} طلا)", callback_data="trade_sell_500")],
+            [InlineKeyboardButton(f"💰 خرید ۱۰۰ نفت ({int(100/gold_price*100):,} طلا)", callback_data="trade_buy_100")],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data="economic_menu")]
         ])
     )
 
@@ -2134,7 +2149,7 @@ async def trade_action(update: Update, context: ContextTypes.DEFAULT_TYPE, actio
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"🛢️ فروخته شده: {amount}\n"
             f"💰 دریافتی: {earned:,} طلا",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="trade")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="trade")]])
         )
     else:
         cost = int(amount / oil_price * 100) // 100
@@ -2148,7 +2163,7 @@ async def trade_action(update: Update, context: ContextTypes.DEFAULT_TYPE, actio
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"🛢️ خریداری شده: {amount}\n"
             f"💰 پرداخت: {cost:,} طلا",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="trade")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="trade")]])
         )
 
 # ========== اقتصادی - نفت و انرژی ==========
@@ -2169,11 +2184,11 @@ async def oil_energy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📈 قیمت فروش نفت: {price} طلا / واحد\n\n"
         f"📋 انتخاب کنید:",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton(f"🛢️ فروش ۵۰ نفت ({50*price} طلا)", style="primary", callback_data="sell_oil_50")],
-            [InlineKeyboardButton(f"🛢️ فروش ۱۰۰ نفت ({100*price} طلا)", style="primary", callback_data="sell_oil_100")],
-            [InlineKeyboardButton(f"🛢️ فروش ۵۰۰ نفت ({500*price} طلا)", style="primary", callback_data="sell_oil_500")],
-            [InlineKeyboardButton(f"🛢️ فروش ۱۰۰۰ نفت ({1000*price} طلا)", style="primary", callback_data="sell_oil_1000")],
-            [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="economic_menu")]
+            [InlineKeyboardButton(f"🛢️ فروش ۵۰ نفت ({50*price} طلا)", callback_data="sell_oil_50")],
+            [InlineKeyboardButton(f"🛢️ فروش ۱۰۰ نفت ({100*price} طلا)", callback_data="sell_oil_100")],
+            [InlineKeyboardButton(f"🛢️ فروش ۵۰۰ نفت ({500*price} طلا)", callback_data="sell_oil_500")],
+            [InlineKeyboardButton(f"🛢️ فروش ۱۰۰۰ نفت ({1000*price} طلا)", callback_data="sell_oil_1000")],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data="economic_menu")]
         ])
     )
 
@@ -2195,7 +2210,7 @@ async def sell_oil(update: Update, context: ContextTypes.DEFAULT_TYPE, amount):
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"🛢️ فروخته شده: {amount}\n"
         f"💰 دریافتی: {total:,} طلا",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="oil_energy")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="oil_energy")]])
     )
 
 # ========== نظامی - دانشمندان و کارخانه هسته‌ای ==========
@@ -2220,9 +2235,9 @@ async def nuke_scientists_menu(update: Update, context: ContextTypes.DEFAULT_TYP
         f"💰 طلای شما: {user['gold']:,}\n\n"
         f"📋 هر دانشمند هر ساعت ۱ واحد تحقیق تولید می‌کند.",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("👨‍🔬 استخدام دانشمند", style="success", callback_data="hire_scientist")],
-            [InlineKeyboardButton("📈 دریافت تحقیق", style="success", callback_data="collect_research")],
-            [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")]
+            [InlineKeyboardButton("👨‍🔬 استخدام دانشمند", callback_data="hire_scientist")],
+            [InlineKeyboardButton("📈 دریافت تحقیق", callback_data="collect_research")],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data="military_menu")]
         ])
     )
 
@@ -2261,7 +2276,7 @@ async def collect_research(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer(msg.split("\n")[0], show_alert=True)
     await query.edit_message_text(
         msg,
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="nuke_scientists_menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="nuke_scientists_menu")]])
     )
 
 async def nuke_factory_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2284,8 +2299,8 @@ async def nuke_factory_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💰 طلای شما: {user['gold']:,}\n\n"
         f"📋 کارخانه مواد هسته‌ای برای حملات اتمی تولید می‌کند.",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton(f"🏭 ارتقا ({cost:,} طلا)", style="success", callback_data="upgrade_factory")],
-            [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")]
+            [InlineKeyboardButton(f"🏭 ارتقا ({cost:,} طلا)", callback_data="upgrade_factory")],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data="military_menu")]
         ])
     )
 
@@ -2318,9 +2333,9 @@ async def security_terror(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💰 طلای شما: {user['gold']:,}\n\n"
         f"📋 انتخاب کنید:",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🛡️ افزایش امنیت (۱۰,۰۰۰ طلا)", style="success", callback_data="increase_security")],
-            [InlineKeyboardButton("🗡️ ترور رهبر دشمن (۵۰,۰۰۰ طلا)", style="danger", callback_data="assassination")],
-            [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")]
+            [InlineKeyboardButton("🛡️ افزایش امنیت (۱۰,۰۰۰ طلا)", callback_data="increase_security")],
+            [InlineKeyboardButton("🗡️ ترور رهبر دشمن (۵۰,۰۰۰ طلا)", callback_data="assassination")],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data="military_menu")]
         ])
     )
 
@@ -2339,7 +2354,7 @@ async def increase_security(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"📊 مقاومت در برابر ترور: +۱۰\n"
         f"💰 پرداخت: {cost:,} طلا",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="security_terror")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="security_terror")]])
     )
 
 async def assassination(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2347,7 +2362,7 @@ async def assassination(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     await query.edit_message_text(
         "🗡️ آیدی عددی هدف ترور را وارد کنید:",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="security_terror")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="security_terror")]])
     )
     context.user_data['waiting_for'] = 'assassination_target'
 
@@ -2371,9 +2386,9 @@ async def nuclear_sabotage(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💰 طلای شما: {user['gold']:,}\n\n"
         f"📋 هدف را انتخاب کنید:",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🤖 خرابکاری در NPC", style="danger", callback_data="sabotage_npc")],
-            [InlineKeyboardButton("👤 خرابکاری در کاربر", style="danger", callback_data="sabotage_user")],
-            [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")]
+            [InlineKeyboardButton("🤖 خرابکاری در NPC", callback_data="sabotage_npc")],
+            [InlineKeyboardButton("👤 خرابکاری در کاربر", callback_data="sabotage_user")],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data="military_menu")]
         ])
     )
 
@@ -2395,20 +2410,20 @@ async def sabotage_npc_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not npcs:
         await query.edit_message_text(
             "❌ هیچ NPC فعالی وجود ندارد!",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="nuclear_sabotage")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="nuclear_sabotage")]])
         )
         return
 
     keyboard = []
     row = []
     for npc in npcs[:20]:
-        row.append(InlineKeyboardButton(f"🤖 {npc['name']}", style="danger", callback_data=f"sabotage_target_npc_{npc['id']}"))
+        row.append(InlineKeyboardButton(f"🤖 {npc['name']}", callback_data=f"sabotage_target_npc_{npc['id']}"))
         if len(row) == 2:
             keyboard.append(row)
             row = []
     if row:
         keyboard.append(row)
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="nuclear_sabotage")])
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="nuclear_sabotage")])
 
     await query.edit_message_text(
         f"🤖 خرابکاری در NPC\n💰 هزینه: {SABOTAGE_COST:,} طلا\n💰 موجودی: {user['gold']:,}\n\n🎯 هدف را انتخاب کنید:",
@@ -2432,20 +2447,20 @@ async def sabotage_user_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not other_users:
         await query.edit_message_text(
             "❌ هیچ کاربر دیگری وجود ندارد!",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="nuclear_sabotage")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="nuclear_sabotage")]])
         )
         return
 
     keyboard = []
     row = []
     for u in other_users[:20]:
-        row.append(InlineKeyboardButton(f"🏳️ {u['name']}", style="danger", callback_data=f"sabotage_target_user_{u['user_id']}"))
+        row.append(InlineKeyboardButton(f"🏳️ {u['name']}", callback_data=f"sabotage_target_user_{u['user_id']}"))
         if len(row) == 2:
             keyboard.append(row)
             row = []
     if row:
         keyboard.append(row)
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="nuclear_sabotage")])
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="nuclear_sabotage")])
 
     await query.edit_message_text(
         f"👤 خرابکاری در کاربر\n💰 هزینه: {SABOTAGE_COST:,} طلا\n💰 موجودی: {user['gold']:,}\n\n🎯 هدف را انتخاب کنید:",
@@ -2476,7 +2491,7 @@ async def execute_sabotage_npc(update: Update, context: ContextTypes.DEFAULT_TYP
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"❌ مامور شما در {npc['name']} دستگیر شد!\n"
             f"💰 هزینه از دست رفته: {SABOTAGE_COST:,}",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="nuclear_sabotage")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="nuclear_sabotage")]])
         )
         return
 
@@ -2493,7 +2508,7 @@ async def execute_sabotage_npc(update: Update, context: ContextTypes.DEFAULT_TYP
         f"💰 طلای نابود شده: {gold_lost:,}\n"
         f"🛢️ نفت نابود شده: {oil_lost:,}\n"
         f"⚔️ ارتش نابود شده: {army_lost}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="nuclear_sabotage")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="nuclear_sabotage")]])
     )
 
 async def execute_sabotage_user(update: Update, context: ContextTypes.DEFAULT_TYPE, target_id):
@@ -2520,7 +2535,7 @@ async def execute_sabotage_user(update: Update, context: ContextTypes.DEFAULT_TY
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"❌ مامور شما در {target['country_name']} دستگیر شد!\n"
             f"💰 هزینه از دست رفته: {SABOTAGE_COST:,}",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="nuclear_sabotage")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="nuclear_sabotage")]])
         )
         return
 
@@ -2548,7 +2563,7 @@ async def execute_sabotage_user(update: Update, context: ContextTypes.DEFAULT_TY
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"🎯 هدف: {target['country_name']}\n"
         f"{result_text}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="nuclear_sabotage")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="nuclear_sabotage")]])
     )
 
 # ========== انتقال طلا ==========
@@ -2569,13 +2584,13 @@ async def transfer_gold(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
     row = []
     for u in other_users[:20]:
-        row.append(InlineKeyboardButton(f"🏳️ {u['name']}", style="success", callback_data=f"transfer_to_{u['user_id']}"))
+        row.append(InlineKeyboardButton(f"🏳️ {u['name']}", callback_data=f"transfer_to_{u['user_id']}"))
         if len(row) == 2:
             keyboard.append(row)
             row = []
     if row:
         keyboard.append(row)
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="economic_menu")])
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="economic_menu")])
 
     await query.edit_message_text(
         f"💰 انتقال طلا\n💰 موجودی: {user['gold']:,}\n\n🎯 دریافت‌کننده را انتخاب کنید:",
@@ -2589,7 +2604,7 @@ async def select_transfer_amount(update: Update, context: ContextTypes.DEFAULT_T
     target = get_user(target_id)
     await query.edit_message_text(
         f"💰 انتقال طلا به {target['country_name']}\n\nمقدار طلا را وارد کنید:",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="economic_menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="economic_menu")]])
     )
     context.user_data['waiting_for'] = 'transfer_amount'
 
@@ -2661,7 +2676,7 @@ async def free_money(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"✅ {amount:,} طلا دریافت شد!\n"
         f"💰 موجودی جدید: {user['gold'] + amount:,}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]])
     )
 
 # ========== اتحاد ==========
@@ -2678,8 +2693,8 @@ async def alliance(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🤝 اتحاد فعلی: {user['alliance']}\n\n"
             f"📋 انتخاب کنید:",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("❌ لغو اتحاد", style="danger", callback_data="cancel_alliance")],
-                [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="political_menu")]
+                [InlineKeyboardButton("❌ لغو اتحاد", callback_data="cancel_alliance")],
+                [InlineKeyboardButton("🔙 بازگشت", callback_data="political_menu")]
             ])
         )
     else:
@@ -2687,13 +2702,13 @@ async def alliance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = []
         row = []
         for npc in npcs[:6]:
-            row.append(InlineKeyboardButton(npc["name"], style="success", callback_data=f"ally_{npc['id']}"))
+            row.append(InlineKeyboardButton(npc["name"], callback_data=f"ally_{npc['id']}"))
             if len(row) == 2:
                 keyboard.append(row)
                 row = []
         if row:
             keyboard.append(row)
-        keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="political_menu")])
+        keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="political_menu")])
         await query.edit_message_text(
             "🤝 انتخاب متحد:\nبا اتحاد، ۱۰٪ قدرت دفاعی بیشتر می‌گیرید.",
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -2711,7 +2726,7 @@ async def create_alliance(update: Update, context: ContextTypes.DEFAULT_TYPE, np
     await query.answer(f"✅ با {npc['name']} متحد شدید!", show_alert=True)
     await query.edit_message_text(
         f"✅ اتحاد برقرار شد!\n🤝 متحد شما: {npc['name']}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="political_menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="political_menu")]])
     )
 
 async def cancel_alliance(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2720,7 +2735,7 @@ async def cancel_alliance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     update_user(user_id, alliance="")
     await query.answer("❌ اتحاد لغو شد!", show_alert=True)
-    await query.edit_message_text("❌ اتحاد لغو شد.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="political_menu")]]))
+    await query.edit_message_text("❌ اتحاد لغو شد.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="political_menu")]]))
 
 # ========== جاسوسی ==========
 async def spy(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2741,13 +2756,13 @@ async def spy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
     row = []
     for u in other_users[:10]:
-        row.append(InlineKeyboardButton(f"🏳️ {u['name']}", style="danger", callback_data=f"spy_{u['user_id']}"))
+        row.append(InlineKeyboardButton(f"🏳️ {u['name']}", callback_data=f"spy_{u['user_id']}"))
         if len(row) == 2:
             keyboard.append(row)
             row = []
     if row:
         keyboard.append(row)
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")])
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="military_menu")])
 
     await query.edit_message_text(
         f"🕵️ مرکز جاسوسی\n💰 هزینه: {cost} طلا\n💰 موجودی: {user['gold']:,}\n\n🎯 هدف را انتخاب کنید:",
@@ -2777,7 +2792,7 @@ async def execute_spy(update: Update, context: ContextTypes.DEFAULT_TYPE, target
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"❌ مامور شما دستگیر شد!\n"
             f"💰 هزینه از دست رفته: {cost}",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="military_menu")]])
         )
         return
 
@@ -2793,7 +2808,7 @@ async def execute_spy(update: Update, context: ContextTypes.DEFAULT_TYPE, target
         f"⚔️ قدرت تخمینی: {int(power)}\n"
         f"🏰 کلن: {target['clan'] or 'ندارد'}\n"
         f"👑 VIP: {'بله' if target['is_vip'] else 'خیر'}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="military_menu")]])
     )
 
 # ========== حمله اتمی ==========
@@ -2808,7 +2823,7 @@ async def nuke_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             "☢️ شما سلاح هسته‌ای ندارید!\n"
             "برای ساخت از پروژه‌های ملی اقدام کنید.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="military_menu")]])
         )
         return
 
@@ -2821,13 +2836,13 @@ async def nuke_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
     row = []
     for u in other_users[:10]:
-        row.append(InlineKeyboardButton(f"🏳️ {u['name']}", style="danger", callback_data=f"nuke_{u['user_id']}"))
+        row.append(InlineKeyboardButton(f"🏳️ {u['name']}", callback_data=f"nuke_{u['user_id']}"))
         if len(row) == 2:
             keyboard.append(row)
             row = []
     if row:
         keyboard.append(row)
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")])
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="military_menu")])
 
     await query.edit_message_text(
         "☢️ حمله اتمی\n⚠️ این حمله خسارات سنگین وارد می‌کند!\n\n🎯 هدف را انتخاب کنید:",
@@ -2857,7 +2872,7 @@ async def execute_nuke(update: Update, context: ContextTypes.DEFAULT_TYPE, targe
         f"💰 خسارت طلا: {damage_gold:,}\n"
         f"🛢️ خسارت نفت: {damage_oil:,}\n"
         f"⚠️ سلاح هسته‌ای شما مصرف شد!",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="military_menu")]])
     )
     try:
         await context.bot.send_message(
@@ -2879,16 +2894,16 @@ async def national_projects(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     keyboard = [
-        [InlineKeyboardButton("🏭 توسعه اقتصاد (۵۰۰ طلا)", style="success", callback_data="project_economy"),
-         InlineKeyboardButton("🔬 توسعه فناوری (۵۰۰ طلا)", style="success", callback_data="project_tech")],
-        [InlineKeyboardButton("👥 افزایش جمعیت (۳۰۰ طلا)", style="success", callback_data="project_population"),
-         InlineKeyboardButton("☢️ سلاح هسته‌ای (۵,۰۰۰ طلا)", style="primary", callback_data="project_nuke")],
-        [InlineKeyboardButton("🏠 پناهگاه اتمی (۱,۰۰۰ طلا)", style="primary", callback_data="project_shelter"),
-         InlineKeyboardButton("⚔️ توسعه ارتش (۴۰۰ طلا)", style="success", callback_data="project_army")],
+        [InlineKeyboardButton("🏭 توسعه اقتصاد (۵۰۰ طلا)", callback_data="project_economy"),
+         InlineKeyboardButton("🔬 توسعه فناوری (۵۰۰ طلا)", callback_data="project_tech")],
+        [InlineKeyboardButton("👥 افزایش جمعیت (۳۰۰ طلا)", callback_data="project_population"),
+         InlineKeyboardButton("☢️ سلاح هسته‌ای (۵,۰۰۰ طلا)", callback_data="project_nuke")],
+        [InlineKeyboardButton("🏠 پناهگاه اتمی (۱,۰۰۰ طلا)", callback_data="project_shelter"),
+         InlineKeyboardButton("⚔️ توسعه ارتش (۴۰۰ طلا)", callback_data="project_army")],
     ]
     if user["is_vip"]:
-        keyboard.append([InlineKeyboardButton("👑 خرید VIP (۲۰,۰۰۰,۰۰۰ طلا)", style="success", callback_data="buy_vip")])
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="economic_menu")])
+        keyboard.append([InlineKeyboardButton("👑 خرید VIP (۲۰,۰۰۰,۰۰۰ طلا)", callback_data="buy_vip")])
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="economic_menu")])
 
     await query.edit_message_text(
         f"🏗️ پروژه‌های ملی\n"
@@ -2943,7 +2958,7 @@ async def execute_project(update: Update, context: ContextTypes.DEFAULT_TYPE, pr
     await query.answer("✅ پروژه تکمیل شد!", show_alert=True)
     await query.edit_message_text(
         f"✅ {msg}\n💰 طلای باقی‌مانده: {new_gold:,}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به پروژه‌ها", style="primary", callback_data="national_projects")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به پروژه‌ها", callback_data="national_projects")]])
     )
 
 async def buy_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2976,7 +2991,7 @@ async def buy_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"• 🕵️ جاسوسی پیشرفته\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"💰 طلای باقی‌مانده: {new_gold:,}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]])
     )
 
 # ========== بازار سیاه ==========
@@ -2989,13 +3004,13 @@ async def black_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     rand_price = random.randint(50, 200)
     keyboard = [
-        [InlineKeyboardButton(f"💰 خرید اسلحه قاچاق ({rand_price} طلا)", style="danger", callback_data=f"black_weapon_{rand_price}"),
-         InlineKeyboardButton(f"🛢️ خرید نفت قاچاق ({rand_price//2} طلا)", style="danger", callback_data=f"black_oil_{rand_price//2}")],
+        [InlineKeyboardButton(f"💰 خرید اسلحه قاچاق ({rand_price} طلا)", callback_data=f"black_weapon_{rand_price}"),
+         InlineKeyboardButton(f"🛢️ خرید نفت قاچاق ({rand_price//2} طلا)", callback_data=f"black_oil_{rand_price//2}")],
     ]
     if user["is_vip"]:
-        keyboard.append([InlineKeyboardButton("💎 خرید موشک قاچاق (۵,۰۰۰ طلا)", style="danger", callback_data="black_missile"),
-                        InlineKeyboardButton("💎 خرید پهپاد قاچاق (۳,۰۰۰ طلا)", style="danger", callback_data="black_drone")])
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="economic_menu")])
+        keyboard.append([InlineKeyboardButton("💎 خرید موشک قاچاق (۵,۰۰۰ طلا)", callback_data="black_missile"),
+                        InlineKeyboardButton("💎 خرید پهپاد قاچاق (۳,۰۰۰ طلا)", callback_data="black_drone")])
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="economic_menu")])
     await query.edit_message_text(
         f"🏴 بازار سیاه\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -3036,7 +3051,7 @@ async def black_market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE, i
         msg = "✅ خرید انجام شد!"
     await query.edit_message_text(
         f"✅ خرید قاچاق موفق!\n━━━━━━━━━━━━━━━━━━━━\n{msg}\n💰 طلای باقی‌مانده: {new_gold:,}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به بازار سیاه", style="primary", callback_data="black_market")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به بازار سیاه", callback_data="black_market")]])
     )
 
 # ========== نقشه جنگی ==========
@@ -3059,7 +3074,7 @@ async def war_map(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if user_obj:
                 power = calculate_attack_power(user_obj["equipment"], user_obj["army"], user_obj["tech"], user_obj.get("vip_buildings"))
                 text += f"🏳️ {u['name']} | ⚔️ {power}\n"
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")]]))
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="military_menu")]]))
 
 # ========== رتبه‌بندی ==========
 async def rankings(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3079,7 +3094,7 @@ async def rankings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         vip = " 👑" if row[4] else ""
         clan = f" [{row[5]}]" if row[5] else ""
         text += f"{medal} {row[0]}{vip}{clan}\n💰 طلا: {row[1]:,}\n🏆 پیروزی‌ها: {row[2]}\n🏭 اقتصاد: {row[3]}\n━━━━━━━━━━━━━━━━━━━━\n"
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]]))
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]]))
 
 # ========== شرط‌بندی ==========
 async def betting(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3099,9 +3114,9 @@ async def betting(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['bet_country1'] = country1
     context.user_data['bet_country2'] = country2
     keyboard = [
-        [InlineKeyboardButton(f"🎯 {country1['name']} (شانس {random.randint(30, 70)}%)", style="primary", callback_data="bet_1")],
-        [InlineKeyboardButton(f"🎯 {country2['name']} (شانس {random.randint(30, 70)}%)", style="primary", callback_data="bet_2")],
-        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]
+        [InlineKeyboardButton(f"🎯 {country1['name']} (شانس {random.randint(30, 70)}%)", callback_data="bet_1")],
+        [InlineKeyboardButton(f"🎯 {country2['name']} (شانس {random.randint(30, 70)}%)", callback_data="bet_2")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]
     ]
     await query.edit_message_text(
         f"🎰 شرط‌بندی\n"
@@ -3179,19 +3194,19 @@ async def clans(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"🏆 برد: {clan['wins']} | شکست: {clan['losses']}\n"
             )
             keyboard = [
-                [InlineKeyboardButton("📋 لیست اعضا", style="primary", callback_data="clan_members")],
-                [InlineKeyboardButton("🚪 خروج از کلن", style="danger", callback_data="clan_leave")],
-                [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]
+                [InlineKeyboardButton("📋 لیست اعضا", callback_data="clan_members")],
+                [InlineKeyboardButton("🚪 خروج از کلن", callback_data="clan_leave")],
+                [InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]
             ]
             await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
         else:
             update_user(user_id, clan="")
-            await query.edit_message_text("کلن شما حذف شده است!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]]))
+            await query.edit_message_text("کلن شما حذف شده است!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]]))
     else:
         keyboard = [
-            [InlineKeyboardButton("🏰 ایجاد کلن جدید", style="success", callback_data="clan_create")],
-            [InlineKeyboardButton("📋 لیست کلن‌ها", style="primary", callback_data="clan_list")],
-            [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]
+            [InlineKeyboardButton("🏰 ایجاد کلن جدید", callback_data="clan_create")],
+            [InlineKeyboardButton("📋 لیست کلن‌ها", callback_data="clan_list")],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]
         ]
         await query.edit_message_text(
             f"🏰 کلن‌ها\n━━━━━━━━━━━━━━━━━━━━\nشما عضو هیچ کلنی نیستید.\n\n📋 انتخاب کنید:",
@@ -3201,7 +3216,7 @@ async def clans(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def clan_create(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("🏰 نام کلن را وارد کنید:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="clans")]]))
+    await query.edit_message_text("🏰 نام کلن را وارد کنید:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="clans")]]))
     context.user_data['waiting_for'] = 'clan_name'
 
 async def receive_clan_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3215,7 +3230,7 @@ async def receive_clan_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     create_clan(clan_name, user_id)
     update_user(user_id, clan=clan_name)
-    await update.message.reply_text(f"✅ کلن {clan_name} با موفقیت ایجاد شد!\nشما رهبر کلن هستید.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]]))
+    await update.message.reply_text(f"✅ کلن {clan_name} با موفقیت ایجاد شد!\nشما رهبر کلن هستید.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]]))
     context.user_data['waiting_for'] = None
 
 async def clan_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3232,7 +3247,7 @@ async def clan_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "🏰 لیست کلن‌ها\n━━━━━━━━━━━━━━━━━━━━\n\n"
     for i, row in enumerate(rows, 1):
         text += f"{i}. {row[0]}\n👤 رهبر: {row[1]}\n📈 سطح: {row[2]} | 🏆 برد: {row[3]}\n━━━━━━━━━━━━━━━━━━━━\n"
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="clans")]]))
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="clans")]]))
 
 async def clan_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -3250,7 +3265,7 @@ async def clan_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
         member = get_user(member_id)
         if member:
             members_text += f"• {member['country_name']} (ID: {member_id})\n"
-    await query.edit_message_text(members_text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="clans")]]))
+    await query.edit_message_text(members_text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="clans")]]))
 
 async def clan_leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -3279,9 +3294,9 @@ async def duel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("ابتدا /start کنید")
         return
     keyboard = [
-        [InlineKeyboardButton("⚔️ درخواست دوئل", style="danger", callback_data="duel_request")],
-        [InlineKeyboardButton("📊 آمار دوئل‌ها", style="danger", callback_data="duel_stats")],
-        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]
+        [InlineKeyboardButton("⚔️ درخواست دوئل", callback_data="duel_request")],
+        [InlineKeyboardButton("📊 آمار دوئل‌ها", callback_data="duel_stats")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]
     ]
     await query.edit_message_text(
         f"⚔️ دوئل\n━━━━━━━━━━━━━━━━━━━━\n🏆 برد: {user['duel_wins']}\n💔 باخت: {user['duel_losses']}\n━━━━━━━━━━━━━━━━━━━━\n📋 انتخاب کنید:",
@@ -3291,7 +3306,7 @@ async def duel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def duel_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("⚔️ آیدی عددی حریف را وارد کنید:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="duel")]]))
+    await query.edit_message_text("⚔️ آیدی عددی حریف را وارد کنید:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="duel")]]))
     context.user_data['waiting_for'] = 'duel_opponent'
 
 async def receive_duel_opponent(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3336,7 +3351,7 @@ async def duel_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     win_rate = int(user['duel_wins'] / total * 100) if total > 0 else 0
     await query.edit_message_text(
         f"📊 آمار دوئل‌ها\n━━━━━━━━━━━━━━━━━━━━\n🏆 برد: {user['duel_wins']}\n💔 باخت: {user['duel_losses']}\n📈 درصد برد: {win_rate}%",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="duel")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="duel")]])
     )
 
 # ========== بازار سهام ==========
@@ -3351,8 +3366,8 @@ async def stock_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
     npcs = get_npc_countries()
     keyboard = []
     for npc in npcs:
-        keyboard.append([InlineKeyboardButton(f"📈 {npc['name']} (قیمت: {npc['share_price']})", style="primary", callback_data=f"stock_{npc['id']}")])
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="economic_menu")])
+        keyboard.append([InlineKeyboardButton(f"📈 {npc['name']} (قیمت: {npc['share_price']})", callback_data=f"stock_{npc['id']}")])
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="economic_menu")])
     shares = user.get("shares", {})
     text = f"📈 بازار سهام\n━━━━━━━━━━━━━━━━━━━━\n💰 طلا: {user['gold']:,}\n\n"
     if shares:
@@ -3373,9 +3388,9 @@ async def stock_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, npc_i
         await query.edit_message_text("❌ کشور یافت نشد!")
         return
     keyboard = [
-        [InlineKeyboardButton("💰 خرید سهام", style="success", callback_data=f"stock_buy_{npc_id}")],
-        [InlineKeyboardButton("💰 فروش سهام", style="primary", callback_data=f"stock_sell_{npc_id}")],
-        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="stock_market")]
+        [InlineKeyboardButton("💰 خرید سهام", callback_data=f"stock_buy_{npc_id}")],
+        [InlineKeyboardButton("💰 فروش سهام", callback_data=f"stock_sell_{npc_id}")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="stock_market")]
     ]
     await query.edit_message_text(
         f"📈 {npc['name']}\n━━━━━━━━━━━━━━━━━━━━\n💰 قیمت سهام: {npc['share_price']}\n💰 طلای شما: {user['gold']:,}\n📊 سهام شما: {user.get('shares', {}).get(npc['name'], 0)}",
@@ -3402,7 +3417,7 @@ async def stock_buy(update: Update, context: ContextTypes.DEFAULT_TYPE, npc_id):
     update_user(user_id, gold=new_gold, shares=shares)
     await query.edit_message_text(
         f"✅ خرید سهام موفق!\n━━━━━━━━━━━━━━━━━━━━\n🏳️ {npc['name']}\n💰 قیمت: {price}\n📈 قیمت جدید: {new_price}\n💰 طلای باقی‌مانده: {new_gold:,}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به بازار", style="primary", callback_data="stock_market")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به بازار", callback_data="stock_market")]])
     )
 
 async def stock_sell(update: Update, context: ContextTypes.DEFAULT_TYPE, npc_id):
@@ -3427,7 +3442,7 @@ async def stock_sell(update: Update, context: ContextTypes.DEFAULT_TYPE, npc_id)
     update_user(user_id, gold=new_gold, shares=shares)
     await query.edit_message_text(
         f"✅ فروش سهام موفق!\n━━━━━━━━━━━━━━━━━━━━\n🏳️ {npc['name']}\n💰 قیمت: {price}\n📈 قیمت جدید: {new_price}\n💰 طلای جدید: {new_gold:,}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به بازار", style="primary", callback_data="stock_market")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به بازار", callback_data="stock_market")]])
     )
 
 # ========== ماموریت روزانه ==========
@@ -3455,7 +3470,7 @@ async def daily_mission(update: Update, context: ContextTypes.DEFAULT_TYPE):
     update_user(user_id, last_daily_mission=now)
     await query.edit_message_text(
         f"🎯 ماموریت روزانه\n━━━━━━━━━━━━━━━━━━━━\n📋 ماموریت: {mission['target']} بار {mission['type']}\n🎁 جایزه: {mission['reward']} طلا\n🔥 استریک: {user['daily_streak'] + 1}\n━━━━━━━━━━━━━━━━━━━━\n✅ ماموریت جدید ثبت شد!",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]])
     )
 
 # ========== هدیه روزانه ==========
@@ -3502,7 +3517,7 @@ async def daily_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = f"🚀 {gift['amount']} موشک"
     await query.edit_message_text(
         f"🎁 هدیه روزانه\n━━━━━━━━━━━━━━━━━━━━\n✅ شما دریافت کردید: {msg}\n🔥 استریک: {new_streak}\n💪 پاداش استریک: {streak_bonus} طلا اضافه شد!",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]])
     )
 
 # ========== مسابقه گروهی ==========
@@ -3524,9 +3539,9 @@ async def group_contest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
         text += f"{medal} {row[0]}: {row[1]} امتیاز\n"
     keyboard = [
-        [InlineKeyboardButton("🎯 شرکت در مسابقه", style="success", callback_data="contest_join")],
-        [InlineKeyboardButton("📋 قوانین مسابقه", style="primary", callback_data="contest_rules")],
-        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]
+        [InlineKeyboardButton("🎯 شرکت در مسابقه", callback_data="contest_join")],
+        [InlineKeyboardButton("📋 قوانین مسابقه", callback_data="contest_rules")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]
     ]
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -3540,7 +3555,7 @@ async def contest_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     update_user(user_id, group_points=new_points)
     await query.edit_message_text(
         f"🎯 شما در مسابقه شرکت کردید!\n📊 {points} امتیاز دریافت کردید!\n📊 امتیاز کل: {new_points}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="group_contest")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="group_contest")]])
     )
 
 async def contest_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3556,7 +3571,7 @@ async def contest_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "۶. جایزه سوم: ۱,۰۰۰ طلا\n"
         "۷. مسابقه هر هفته یکشنبه ساعت ۲۴:۰۰ بازنشانی می‌شود."
     )
-    await query.edit_message_text(rules, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="group_contest")]]))
+    await query.edit_message_text(rules, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="group_contest")]]))
 
 # ========== 🎡 گردونه شانس ==========
 async def lucky_wheel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3605,7 +3620,7 @@ async def lucky_wheel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f" x{prize['amount']:,}"
     await query.edit_message_text(
         f"🎡 گردونه شانس\n━━━━━━━━━━━━━━━━━━━━\n🎯 نتیجه چرخش:\n\n🎉 {msg}\n\n⏳ چرخش بعدی: ۱ ساعت دیگر",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]])
     )
 
 # ========== ⛏️ معدن‌کاوی ==========
@@ -3635,7 +3650,7 @@ async def mining(update: Update, context: ContextTypes.DEFAULT_TYPE):
     update_user(user_id, gold=user["gold"] + gold_found, last_mine=now)
     await query.edit_message_text(
         f"⛏️ معدن‌کاوی\n━━━━━━━━━━━━━━━━━━━━\n💰 {gold_found:,} طلا استخراج شد!{upgrade_msg}\n⛏️ قدرت معدن: {mining_power}\n⏳ حفاری بعدی: ۳۰ دقیقه",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]])
     )
 
 # ========== 🗺️ شکار گنج ==========
@@ -3661,17 +3676,17 @@ async def treasure_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             update_user(user_id, gold=user["gold"] + treasure["gold"], oil=user["oil"] + treasure["oil"])
             await query.edit_message_text(
                 f"🗺️ شکار گنج\n━━━━━━━━━━━━━━━━━━━━\n🎉 گنج پیدا شد!\n💰 طلا: {treasure['gold']:,}\n🛢️ نفت: {treasure['oil']:,}\n⚔️ قدرت شما: {int(user_power)} | شانس: {int(find_chance)}%",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]])
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]])
             )
         else:
             await query.edit_message_text(
                 f"🗺️ شکار گنج\n━━━━━━━━━━━━━━━━━━━━\n😢 کسی دیگر این گنج را پیدا کرد!\nدوباره تلاش کنید...",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]])
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]])
             )
     else:
         await query.edit_message_text(
             f"🗺️ شکار گنج\n━━━━━━━━━━━━━━━━━━━━\n😢 گنجی پیدا نشد!\n⚔️ قدرت شما: {int(user_power)} | شانس: {int(find_chance)}%\n💡 با تقویت ارتش شانس خود را افزایش دهید!",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]])
         )
 
 # ========== 🏅 دستاوردها ==========
@@ -3698,7 +3713,7 @@ async def achievements(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for key, name in ACHIEVEMENT_NAMES.items():
         if key not in [a[0] for a in achs]:
             text += f"• 🔒 {name}\n"
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]]))
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]]))
 
 # ========== 👥 دعوت دوستان ==========
 async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3713,7 +3728,7 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     link = f"https://t.me/{bot_username}?start={user_id}"
     await query.edit_message_text(
         f"👥 دعوت دوستان\n━━━━━━━━━━━━━━━━━━━━\n📊 تعداد دعوت شده: {user.get('referrals', 0)}\n\n🔗 لینک دعوت شما:\n{link}\n\n🎁 به ازای هر دوست:\n• 💰 ۵۰۰ طلا\n• 🛢️ ۲۰۰ نفت\n• 🪖 ۲ سرباز\n\n📤 لینک را برای دوستانتان بفرستید!",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]])
     )
 
 # ========== 📰 روزنامه ==========
@@ -3751,7 +3766,7 @@ async def newspaper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for e in events:
             emoji = "🌋" if e[1] == "disaster" else "💰" if e[1] == "economic" else "⚔️"
             text += f"{emoji} {e[0]}\n"
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]]))
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]]))
 
 # ========== 🎪 تورنمنت ==========
 async def tournament(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3766,7 +3781,7 @@ async def tournament(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(all_users) < 4:
         await query.edit_message_text(
             "🎪 تورنمنت\n━━━━━━━━━━━━━━━━━━━━\n❌ حداقل ۴ کاربر برای تورنمنت لازم است!\nدوستانتان را دعوت کنید...",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]])
         )
         return
     participants = random.sample(all_users, min(4, len(all_users)))
@@ -3789,7 +3804,7 @@ async def tournament(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if champion["user_id"] == user_id:
         update_user(user_id, gold=user["gold"] + 1000)
         text += "\n\n✨ شما برنده ۱,۰۰۰ طلا شدید!"
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]]))
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]]))
 
 # ========== پنل VIP ==========
 async def vip_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3801,16 +3816,16 @@ async def vip_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ شما VIP نیستید!")
         return
     keyboard = [
-        [InlineKeyboardButton("🏥 ساخت بیمارستان (۵,۰۰۰ طلا)", style="success", callback_data="vip_hospital"),
-         InlineKeyboardButton("🏭 ساخت کارخانه (۱۰,۰۰۰ طلا)", style="success", callback_data="vip_factory")],
-        [InlineKeyboardButton("🛢️ ساخت پالایشگاه (۷,۵۰۰ طلا)", style="success", callback_data="vip_refinery"),
-         InlineKeyboardButton("🎓 ساخت دانشگاه (۵,۰۰۰ طلا)", style="success", callback_data="vip_university")],
-        [InlineKeyboardButton("✈️ ساخت فرودگاه (۱۵,۰۰۰ طلا)", style="success", callback_data="vip_airport"),
-         InlineKeyboardButton("🛡️ پناهگاه پیشرفته (۱۲,۰۰۰ طلا)", style="primary", callback_data="vip_shelter_adv")],
-        [InlineKeyboardButton("💊 خرید مواد مخدر (۲,۰۰۰ طلا)", style="danger", callback_data="vip_buy_drugs"),
-         InlineKeyboardButton("💰 فروش مواد مخدر (۴,۰۰۰ طلا)", style="danger", callback_data="vip_sell_drugs")],
-        [InlineKeyboardButton("💻 حمله سایبری (۵,۰۰۰ طلا)", style="danger", callback_data="vip_cyber_attack")],
-        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]
+        [InlineKeyboardButton("🏥 ساخت بیمارستان (۵,۰۰۰ طلا)", callback_data="vip_hospital"),
+         InlineKeyboardButton("🏭 ساخت کارخانه (۱۰,۰۰۰ طلا)", callback_data="vip_factory")],
+        [InlineKeyboardButton("🛢️ ساخت پالایشگاه (۷,۵۰۰ طلا)", callback_data="vip_refinery"),
+         InlineKeyboardButton("🎓 ساخت دانشگاه (۵,۰۰۰ طلا)", callback_data="vip_university")],
+        [InlineKeyboardButton("✈️ ساخت فرودگاه (۱۵,۰۰۰ طلا)", callback_data="vip_airport"),
+         InlineKeyboardButton("🛡️ پناهگاه پیشرفته (۱۲,۰۰۰ طلا)", callback_data="vip_shelter_adv")],
+        [InlineKeyboardButton("💊 خرید مواد مخدر (۲,۰۰۰ طلا)", callback_data="vip_buy_drugs"),
+         InlineKeyboardButton("💰 فروش مواد مخدر (۴,۰۰۰ طلا)", callback_data="vip_sell_drugs")],
+        [InlineKeyboardButton("💻 حمله سایبری (۵,۰۰۰ طلا)", callback_data="vip_cyber_attack")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]
     ]
     buildings = user["vip_buildings"]
     await query.edit_message_text(
@@ -3852,7 +3867,7 @@ async def build_vip_building(update: Update, context: ContextTypes.DEFAULT_TYPE,
     await query.answer(f"✅ {effect_desc} ساخته شد!", show_alert=True)
     await query.edit_message_text(
         f"✅ {effect_desc} با موفقیت ساخته شد!\n💰 طلای باقی‌مانده: {new_gold:,}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به پنل VIP", style="primary", callback_data="vip_panel")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به پنل VIP", callback_data="vip_panel")]])
     )
 
 async def drugs_trade(update: Update, context: ContextTypes.DEFAULT_TYPE, action):
@@ -3871,7 +3886,7 @@ async def drugs_trade(update: Update, context: ContextTypes.DEFAULT_TYPE, action
         update_user(user_id, gold=new_gold, drugs=new_drugs)
         await query.edit_message_text(
             f"💊 خرید مواد مخدر موفق!\n━━━━━━━━━━━━━━━━━━━━\n✅ ۱۰ واحد خریداری شد\n💰 پرداخت: ۲,۰۰۰ طلا\n💊 موجودی: {new_drugs}",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به پنل VIP", style="primary", callback_data="vip_panel")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به پنل VIP", callback_data="vip_panel")]])
         )
     elif action == "sell":
         drugs = user.get("drugs", 0)
@@ -3882,7 +3897,7 @@ async def drugs_trade(update: Update, context: ContextTypes.DEFAULT_TYPE, action
             update_user(user_id, drugs=0)
             await query.edit_message_text(
                 "💀 دستگیر شدید!\n━━━━━━━━━━━━━━━━━━━━\n❌ پلیس شما را دستگیر کرد!\n💊 تمام مواد مخدر ضبط شد!",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به پنل VIP", style="primary", callback_data="vip_panel")]])
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به پنل VIP", callback_data="vip_panel")]])
             )
             return
         gold_earned = 4000
@@ -3891,7 +3906,7 @@ async def drugs_trade(update: Update, context: ContextTypes.DEFAULT_TYPE, action
         update_user(user_id, gold=new_gold, drugs=new_drugs)
         await query.edit_message_text(
             f"💰 فروش مواد مخدر موفق!\n━━━━━━━━━━━━━━━━━━━━\n✅ ۱۰ واحد فروخته شد\n💰 دریافت: ۴,۰۰۰ طلا\n💊 موجودی: {new_drugs}",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به پنل VIP", style="primary", callback_data="vip_panel")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به پنل VIP", callback_data="vip_panel")]])
         )
 
 async def cyber_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3916,7 +3931,7 @@ async def cyber_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     update_user(user_id, gold=new_gold)
     await query.edit_message_text(
         f"💻 حمله سایبری موفق!\n━━━━━━━━━━━━━━━━━━━━\n🎯 هدف: {target['name']}\n💰 طلای دزدیده: {stolen:,}\n💸 هزینه: ۵,۰۰۰ طلا\n💰 سود خالص: {stolen - 5000:,} طلا",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به پنل VIP", style="primary", callback_data="vip_panel")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به پنل VIP", callback_data="vip_panel")]])
     )
 
 # ========== حمله به NPC ==========
@@ -3975,7 +3990,7 @@ async def execute_npc_attack(update: Update, context: ContextTypes.DEFAULT_TYPE,
             f"🎯 شانس پیروزی: {int(win_chance)}%\n💰 طلای از دست رفته: {gold_lost:,}\n🛢️ نفت از دست رفته: {oil_lost:,}\n"
             f"⚔️ تلفات شما: {sum(attacker_losses.values())}\n🎒 تجهیزات ازدست‌رفته:\n{format_casualties(attacker_losses)}"
         )
-    await query.edit_message_text(result_text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به منو", style="primary", callback_data="menu")]]))
+    await query.edit_message_text(result_text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به منو", callback_data="menu")]]))
 
 # ========== مدیریت کل‌بک‌ها ==========
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4036,9 +4051,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         npc_id = int(data.split("_")[1])
         keyboard = []
         for p in ["10", "20", "30", "40", "50", "60", "70", "80", "90", "100"]:
-            keyboard.append(InlineKeyboardButton(f"{p}%", style="primary", callback_data=f"npc_attack_{npc_id}_{p}"))
+            keyboard.append(InlineKeyboardButton(f"{p}%", callback_data=f"npc_attack_{npc_id}_{p}"))
         rows = [keyboard[i:i+2] for i in range(0, len(keyboard), 2)]
-        rows.append([InlineKeyboardButton("❌ انصراف", style="primary", callback_data="military_attack")])
+        rows.append([InlineKeyboardButton("❌ انصراف", callback_data="military_attack")])
         await query.answer()
         await query.edit_message_text("🎯 درصد نیرو را انتخاب کنید:", reply_markup=InlineKeyboardMarkup(rows))
     elif data.startswith("npc_attack_"):
@@ -4160,7 +4175,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "bet_1" or data == "bet_2":
         context.user_data['bet_choice'] = data
         await query.answer()
-        await query.edit_message_text("💰 مقدار طلای شرط را وارد کنید (حداقل ۱۰۰):", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="betting")]]))
+        await query.edit_message_text("💰 مقدار طلای شرط را وارد کنید (حداقل ۱۰۰):", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="betting")]]))
         context.user_data['waiting_for'] = 'bet_amount'
     elif data == "clans":
         await clans(update, context)
@@ -4326,7 +4341,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_id = int(data[len("admin_remove_admin_"):])
         await admin_remove_admin_action(update, context, target_id)
     else:
-        await query.edit_message_text("❌ این گزینه در حال توسعه است.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]]))
+        await query.edit_message_text("❌ این گزینه در حال توسعه است.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]]))
 
 # ========== Text Handler ==========
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4714,25 +4729,25 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     npcs = get_npc_countries()
     channels = get_required_channels()
     keyboard = [
-        [InlineKeyboardButton("📊 آمار کاربران", style="primary", callback_data="admin_stats"),
-         InlineKeyboardButton("💰 افزودن طلا", style="success", callback_data="admin_add_gold")],
-        [InlineKeyboardButton("🛢️ افزودن نفت", style="success", callback_data="admin_add_oil"),
-         InlineKeyboardButton("👑 اعطای VIP", style="success", callback_data="admin_vip")],
-        [InlineKeyboardButton("🚫 بن کاربر", style="danger", callback_data="admin_ban"),
-         InlineKeyboardButton("📋 لیست کاربران", style="primary", callback_data="admin_users")],
-        [InlineKeyboardButton("🌍 لیست NPC ها", style="primary", callback_data="admin_npcs"),
-         InlineKeyboardButton("➕ اضافه کردن کشور", style="primary", callback_data="admin_add_country")],
-        [InlineKeyboardButton("📊 گزارش حملات", style="primary", callback_data="admin_logs"),
-         InlineKeyboardButton("📁 دریافت دیتابیس", style="success", callback_data="admin_getdb")],
-        [InlineKeyboardButton("📤 افزودن دیتابیس", style="primary", callback_data="admin_upload_db")],
-        [InlineKeyboardButton("📢 کانال اجباری", style="primary", callback_data="admin_channels"),
-         InlineKeyboardButton("🎟️ مدیریت کوپن", style="primary", callback_data="admin_coupons")],
-        [InlineKeyboardButton("💰 طلای همگانی", style="primary", callback_data="admin_global_gold"),
-         InlineKeyboardButton("🛢️ نفت همگانی", style="primary", callback_data="admin_global_oil")],
-        [InlineKeyboardButton("➕ افزودن ادمین", style="success", callback_data="admin_add_admin"),
-         InlineKeyboardButton("📋 لیست ادمین‌ها", style="primary", callback_data="admin_list_admins")],
-        [InlineKeyboardButton("📣 پیام همگانی", style="primary", callback_data="admin_broadcast")],
-        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]
+        [InlineKeyboardButton("📊 آمار کاربران", callback_data="admin_stats"),
+         InlineKeyboardButton("💰 افزودن طلا", callback_data="admin_add_gold")],
+        [InlineKeyboardButton("🛢️ افزودن نفت", callback_data="admin_add_oil"),
+         InlineKeyboardButton("👑 اعطای VIP", callback_data="admin_vip")],
+        [InlineKeyboardButton("🚫 بن کاربر", callback_data="admin_ban"),
+         InlineKeyboardButton("📋 لیست کاربران", callback_data="admin_users")],
+        [InlineKeyboardButton("🌍 لیست NPC ها", callback_data="admin_npcs"),
+         InlineKeyboardButton("➕ اضافه کردن کشور", callback_data="admin_add_country")],
+        [InlineKeyboardButton("📊 گزارش حملات", callback_data="admin_logs"),
+         InlineKeyboardButton("📁 دریافت دیتابیس", callback_data="admin_getdb")],
+        [InlineKeyboardButton("📤 افزودن دیتابیس", callback_data="admin_upload_db")],
+        [InlineKeyboardButton("📢 کانال اجباری", callback_data="admin_channels"),
+         InlineKeyboardButton("🎟️ مدیریت کوپن", callback_data="admin_coupons")],
+        [InlineKeyboardButton("💰 طلای همگانی", callback_data="admin_global_gold"),
+         InlineKeyboardButton("🛢️ نفت همگانی", callback_data="admin_global_oil")],
+        [InlineKeyboardButton("➕ افزودن ادمین", callback_data="admin_add_admin"),
+         InlineKeyboardButton("📋 لیست ادمین‌ها", callback_data="admin_list_admins")],
+        [InlineKeyboardButton("📣 پیام همگانی", callback_data="admin_broadcast")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="menu")]
     ]
     text = (f"👑 پنل مدیریت\n━━━━━━━━━━━━━━━━━━━━\n👥 کاربران: {len(users)}\n🤖 NPC ها: {len(npcs)}\n📢 کانال‌ها: {len(channels)}\n━━━━━━━━━━━━━━━━━━━━\n📋 انتخاب کنید:")
     if update.message:
@@ -4756,7 +4771,7 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.close()
     await query.edit_message_text(
         f"📊 آمار ربات\n━━━━━━━━━━━━━━━━━━━━\n👥 کل کاربران: {total_users}\n💰 کل طلا: {total_gold:,}\n👑 VIP ها: {total_vip}\n⚔️ کل حملات: {total_attacks}\n━━━━━━━━━━━━━━━━━━━━",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="admin")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="admin")]])
     )
 
 async def admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4768,7 +4783,7 @@ async def admin_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
         vip = " 👑" if user["is_vip"] else ""
         clan = f" [{user['clan']}]" if user['clan'] else ""
         text += f"{i}. {user['name']}{vip}{clan}\n💰 طلا: {user['gold']:,} | 🏆 برد: {user['wins']}\n━━━━━━━━━━━━━━━━━━━━\n"
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="admin")]]))
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="admin")]]))
 
 async def admin_npcs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -4777,7 +4792,7 @@ async def admin_npcs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "🤖 لیست NPC ها\n━━━━━━━━━━━━━━━━━━━━\n\n"
     for i, npc in enumerate(npcs[:20], 1):
         text += f"{i}. {npc['name']}\n💰 طلا: {npc['gold']:,} | ⚔️ ارتش: {npc['army']}\n━━━━━━━━━━━━━━━━━━━━\n"
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="admin")]]))
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="admin")]]))
 
 async def admin_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -4791,7 +4806,7 @@ async def admin_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for row in rows:
         time_str = datetime.fromtimestamp(row[4]).strftime("%H:%M")
         text += f"🕐 {time_str} - {row[0]} → {row[1]}\n📊 نتیجه: {row[2]} | 💰 غنیمت: {row[3]}\n━━━━━━━━━━━━━━━━━━━━\n"
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="admin")]]))
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data="admin")]]))
 
 async def admin_channels(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -4801,9 +4816,9 @@ async def admin_channels(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for ch in channels:
         text += f"• {ch['channel_name']} ({ch['channel_id']})\n"
     keyboard = [
-        [InlineKeyboardButton("➕ افزودن کانال", style="primary", callback_data="admin_add_channel")],
-        [InlineKeyboardButton("❌ حذف کانال", style="danger", callback_data="admin_remove_channel")],
-        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="admin")]
+        [InlineKeyboardButton("➕ افزودن کانال", callback_data="admin_add_channel")],
+        [InlineKeyboardButton("❌ حذف کانال", callback_data="admin_remove_channel")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="admin")]
     ]
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -4814,13 +4829,13 @@ async def admin_add_channel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📢 فقط آیدی کانال یا گروه رو با @ بفرست (یا لینک t.me یا آیدی عددی -100...).\n"
         "مثال: @mychannel\n\n"
         "⚠️ قبلش ربات رو ادمین همون کانال/گروه کن، وگرنه نمی‌تونه عضویت رو چک کنه.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="admin_channels")]]))
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="admin_channels")]]))
     context.user_data['waiting_for'] = 'admin_add_channel'
 
 async def admin_remove_channel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("❌ آیدی کانال را برای حذف وارد کنید:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="admin_channels")]]))
+    await query.edit_message_text("❌ آیدی کانال را برای حذف وارد کنید:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="admin_channels")]]))
     context.user_data['waiting_for'] = 'admin_remove_channel'
 
 async def admin_coupons(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4837,8 +4852,8 @@ async def admin_coupons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         expired = "❌ منقضی" if row[5] > 0 and row[5] < now else "✅ فعال"
         text += f"🎟️ {row[0]} | {row[1]} | {row[2]:,}\n📊 {row[4]}/{row[3]} استفاده | {expired}\n━━━━━━━━━━━━━━━━━━━━\n"
     keyboard = [
-        [InlineKeyboardButton("➕ ساخت کوپن", style="success", callback_data="admin_create_coupon")],
-        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="admin")]
+        [InlineKeyboardButton("➕ ساخت کوپن", callback_data="admin_create_coupon")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="admin")]
     ]
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -4847,19 +4862,19 @@ async def admin_create_coupon(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
     await query.edit_message_text(
         "🎟️ فرمت: کد | نوع(gold/oil/vip) | مقدار | حداکثر استفاده | ساعت اعتبار\nمثال: WELCOME | gold | 1000 | 100 | 24",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="admin_coupons")]]))
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="admin_coupons")]]))
     context.user_data['waiting_for'] = 'admin_create_coupon'
 
 async def admin_global_gold(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("💰 مقدار طلای همگانی را وارد کنید:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="admin")]]))
+    await query.edit_message_text("💰 مقدار طلای همگانی را وارد کنید:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="admin")]]))
     context.user_data['waiting_for'] = 'admin_global_gold'
 
 async def admin_global_oil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("🛢️ مقدار نفت همگانی را وارد کنید:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="admin")]]))
+    await query.edit_message_text("🛢️ مقدار نفت همگانی را وارد کنید:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="admin")]]))
     context.user_data['waiting_for'] = 'admin_global_oil'
 
 async def admin_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4869,14 +4884,14 @@ async def admin_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📣 متن پیام همگانی را وارد کنید:\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "⚠️ این پیام برای همه‌ی کاربران ربات ارسال می‌شود.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="admin")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="admin")]])
     )
     context.user_data['waiting_for'] = 'admin_broadcast'
 
 async def admin_add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("➕ آیدی عددی کاربر جدید برای ادمین شدن:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="admin")]]))
+    await query.edit_message_text("➕ آیدی عددی کاربر جدید برای ادمین شدن:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="admin")]]))
     context.user_data['waiting_for'] = 'admin_add_admin'
 
 async def admin_list_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4899,11 +4914,11 @@ async def _render_admin_list(query):
                 date_str = datetime.fromtimestamp(row[0]).strftime("%Y-%m-%d")
                 text += f"• {admin_id} (اضافه شده: {date_str})\n"
                 keyboard.append([
-                    InlineKeyboardButton(f"🔐 دسترسی‌های {admin_id}", style="primary", callback_data=f"admin_perm_menu_{admin_id}"),
-                    InlineKeyboardButton("🗑 حذف کامل", style="danger", callback_data=f"admin_remove_admin_{admin_id}"),
+                    InlineKeyboardButton(f"🔐 دسترسی‌های {admin_id}", callback_data=f"admin_perm_menu_{admin_id}"),
+                    InlineKeyboardButton("🗑 حذف کامل", callback_data=f"admin_remove_admin_{admin_id}"),
                 ])
     conn.close()
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="admin")])
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data="admin")])
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def admin_perm_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, target_id):
@@ -4991,7 +5006,7 @@ async def admin_upload_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⚠️ این فایل جایگزین دیتابیس فعلی می‌شود!\n"
         "💾 یک نسخه پشتیبان از دیتابیس فعلی خودکار نگه‌داری می‌شود.\n"
         "🔄 پس از آپلود، برای اعمال کامل تغییرات، ربات را ری‌استارت کنید.",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="admin")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="admin")]])
     )
     context.user_data['waiting_for'] = 'admin_upload_db'
 
@@ -5095,31 +5110,31 @@ async def getdb_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def admin_add_gold(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("💰 فرمت: آیدی عددی کاربر | مقدار طلا\nمثال: 123456789 5000", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="admin")]]))
+    await query.edit_message_text("💰 فرمت: آیدی عددی کاربر | مقدار طلا\nمثال: 123456789 5000", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="admin")]]))
     context.user_data['waiting_for'] = 'admin_gold'
 
 async def admin_add_oil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("🛢️ فرمت: آیدی عددی کاربر | مقدار نفت\nمثال: 123456789 500", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="admin")]]))
+    await query.edit_message_text("🛢️ فرمت: آیدی عددی کاربر | مقدار نفت\nمثال: 123456789 500", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="admin")]]))
     context.user_data['waiting_for'] = 'admin_oil'
 
 async def admin_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("👑 آیدی عددی کاربر را برای اعطای VIP وارد کنید:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="admin")]]))
+    await query.edit_message_text("👑 آیدی عددی کاربر را برای اعطای VIP وارد کنید:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="admin")]]))
     context.user_data['waiting_for'] = 'admin_vip'
 
 async def admin_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("🚫 آیدی عددی کاربر را برای بن کردن وارد کنید:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="admin")]]))
+    await query.edit_message_text("🚫 آیدی عددی کاربر را برای بن کردن وارد کنید:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="admin")]]))
     context.user_data['waiting_for'] = 'admin_ban'
 
 async def admin_add_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("➕ فرمت: نام | طلا | نفت | ارتش\nمثال: 🇩🇪 آلمان | 5000 | 2000 | 10", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="admin")]]))
+    await query.edit_message_text("➕ فرمت: نام | طلا | نفت | ارتش\nمثال: 🇩🇪 آلمان | 5000 | 2000 | 10", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="admin")]]))
     context.user_data['waiting_for'] = 'admin_add_country'
 
 # ========== Coupon & Referral ==========
@@ -5173,7 +5188,7 @@ async def enter_coupon(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await query.edit_message_text(
         "🎟️ کد کوپن خود را وارد کنید:",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="economic_menu")]])
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", callback_data="economic_menu")]])
     )
     context.user_data['waiting_for'] = 'coupon_code'
 
