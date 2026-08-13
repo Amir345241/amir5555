@@ -20,7 +20,7 @@ if not TOKEN:
         "توی Railway برو به تب Variables و BOT_TOKEN رو با توکن ربات‌ات اضافه کن."
     )
 ADMIN_IDS = [int(x) for x in os.environ.get("ADMIN_IDS", "7845464086").split(",") if x.strip()]
-CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1003291120997"))
+CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1002157518380"))
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -1541,6 +1541,13 @@ async def resolve_delayed_attack(attack_id, app):
             )
         except:
             pass
+        await send_to_channel(app, (
+            f"⚔️ گزارش حمله کاربری\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🗡️ مهاجم: {attacker['country_name']}\n"
+            f"🛡️ مدافع: {defender['country_name']}\n"
+            f"🛡️ نتیجه: حمله توسط سپر دفاعی خنثی شد"
+        ))
         return
 
     # Calculate powers
@@ -1741,6 +1748,14 @@ async def defense_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE, a
                 )
             except:
                 pass
+            await send_to_channel(context.application, (
+                f"⚔️ گزارش حمله کاربری\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"🗡️ مهاجم: {attacker['country_name']}\n"
+                f"🛡️ مدافع: {user['country_name']}\n"
+                f"⚔️ نتیجه: ضدحمله مدافع موفق بود\n"
+                f"💰 خسارت به مهاجم: {damage:,} طلا"
+            ))
         else:
             await query.answer("⚔️ ضدحمله ناموفق! نیروی کافی ندارید.", show_alert=True)
             await query.edit_message_text("❌ ضدحمله ناموفق بود. نیروی کافی برای دفع حمله ندارید.")
@@ -4024,6 +4039,7 @@ async def execute_npc_attack(update: Update, context: ContextTypes.DEFAULT_TYPE,
             f"🎯 شانس پیروزی: {int(win_chance)}%\n💰 طلای از دست رفته: {gold_lost:,}\n🛢️ نفت از دست رفته: {oil_lost:,}\n"
             f"⚔️ تلفات شما: {sum(attacker_losses.values())}\n🎒 تجهیزات ازدست‌رفته:\n{format_casualties(attacker_losses)}"
         )
+        await send_to_channel(context.application, f"⚔️ گزارش حمله\n━━━━━━━━━━━━━━━━━━━━\n🗡️ مهاجم: {user['country_name']}\n🛡️ مدافع: {npc['name']}\n❌ نتیجه: شکست\n💰 خسارت: {gold_lost:,} طلا")
     await query.edit_message_text(result_text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به منو", style="primary", callback_data="menu")]]))
 
 # ========== مدیریت کل‌بک‌ها ==========
