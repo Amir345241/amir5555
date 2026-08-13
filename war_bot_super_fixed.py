@@ -12,15 +12,9 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, filters, ContextTypes
 
 # ========== توکن و تنظیمات ==========
-# روی Railway توکن را داخل کد نمی‌نویسیم؛ از Environment Variable خونده می‌شه (BOT_TOKEN).
-TOKEN = os.environ.get("BOT_TOKEN")
-if not TOKEN:
-    raise RuntimeError(
-        "❌ متغیر محیطی BOT_TOKEN تنظیم نشده! "
-        "توی Railway برو به تب Variables و BOT_TOKEN رو با توکن ربات‌ات اضافه کن."
-    )
-ADMIN_IDS = [int(x) for x in os.environ.get("ADMIN_IDS", "7845464086").split(",") if x.strip()]
-CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1002157518380"))
+TOKEN = "8871565672:AAE47gxO-SG5UXz-zOozHbldNIiL7wSLfkQ"
+ADMIN_IDS = [7845464086]
+CHANNEL_ID = -1002157518380
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -29,10 +23,7 @@ logger = logging.getLogger(__name__)
 COUNTRY_NAME, BET_AMOUNT, CLAN_NAME, DUEL_OPPONENT = range(4)
 
 # ========== دیتابیس ==========
-# اگر روی Railway یک Volume ساختی (مثلاً روی /data)، متغیر DB_PATH را روی
-# /data/game.db بذار تا دیتابیس بعد از هر ری‌دیپلوی پاک نشه. اگر چیزی ست نکنی،
-# همون game.db کنار کد ساخته می‌شه (که با هر دیپلوی جدید روی Railway از بین می‌ره).
-DB_NAME = os.environ.get("DB_PATH", "game.db")
+DB_NAME = "game.db"
 
 def db_connect():
     """اتصال استاندارد به دیتابیس با WAL mode و busy_timeout
