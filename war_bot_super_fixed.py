@@ -3935,6 +3935,40 @@ async def cyber_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # ========== حمله به NPC ==========
+async def military_attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    user = get_user(user_id)
+    if not user:
+        await query.answer()
+        await query.edit_message_text("ابتدا /start کنید")
+        return
+    await query.answer()
+
+    npcs = get_npc_countries()
+    if not npcs:
+        await query.edit_message_text(
+            "❌ هیچ NPC فعالی وجود ندارد!",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="attack_menu")]])
+        )
+        return
+
+    keyboard = []
+    row = []
+    for npc in npcs[:20]:
+        row.append(InlineKeyboardButton(f"🤖 {npc['name']}", style="danger", callback_data=f"npc_{npc['id']}"))
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="attack_menu")])
+
+    await query.edit_message_text(
+        "⚔️ حمله به NPC\n\n🎯 هدف را انتخاب کنید:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
 async def execute_npc_attack(update: Update, context: ContextTypes.DEFAULT_TYPE, npc_id, percent):
     query = update.callback_query
     await query.answer()
@@ -4345,6 +4379,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== Text Handler ==========
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
     user_id = update.effective_user.id
     waiting = context.user_data.get('waiting_for')
 
@@ -5011,6 +5047,8 @@ async def admin_upload_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['waiting_for'] = 'admin_upload_db'
 
 async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
     user_id = update.effective_user.id
     waiting = context.user_data.get('waiting_for')
     if waiting != 'admin_upload_db':
@@ -5255,11 +5293,10 @@ def main():
     app.add_handler(CommandHandler("getdb", getdb_command))
     app.add_handler(CommandHandler("coupon", coupon_command))
     app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(MessageHandler(filters.Document.ALL, document_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
+    app.add_handler(MessageHandler(filters.Document.ALL & ~filters.ChatType.CHANNEL, document_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.ChatType.CHANNEL, text_handler))
     print("🤖 ربات جنگ جهانی ریات راه‌اندازی شد!")
     app.run_polling()
 
 if __name__ == "__main__":
     main()
-    
