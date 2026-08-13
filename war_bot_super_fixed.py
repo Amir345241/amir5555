@@ -4081,6 +4081,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("attack_pct_"):
         percent = data.split("_")[2]
         await execute_attack_warning(update, context, percent)
+    elif data.startswith("npc_attack_"):
+        parts = data.split("_")
+        npc_id = int(parts[2])
+        percent = parts[3]
+        await execute_npc_attack(update, context, npc_id, percent)
     elif data.startswith("npc_"):
         npc_id = int(data.split("_")[1])
         keyboard = []
@@ -4090,11 +4095,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         rows.append([InlineKeyboardButton("❌ انصراف", style="primary", callback_data="military_attack")])
         await query.answer()
         await query.edit_message_text("🎯 درصد نیرو را انتخاب کنید:", reply_markup=InlineKeyboardMarkup(rows))
-    elif data.startswith("npc_attack_"):
-        parts = data.split("_")
-        npc_id = int(parts[2])
-        percent = parts[3]
-        await execute_npc_attack(update, context, npc_id, percent)
     elif data.startswith("defense_shield_"):
         attack_id = int(data.split("_")[2])
         await defense_reaction(update, context, "shield", attack_id)
