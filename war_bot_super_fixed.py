@@ -20,7 +20,7 @@ if not TOKEN:
         "توی Railway برو به تب Variables و BOT_TOKEN رو با توکن ربات‌ات اضافه کن."
     )
 ADMIN_IDS = [int(x) for x in os.environ.get("ADMIN_IDS", "7845464086").split(",") if x.strip()]
-CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1002157518380"))
+CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1003291120997"))
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
