@@ -100,6 +100,22 @@ DEFENSIVE_EQUIPMENT = {
 ALL_EQUIPMENT = {**OFFENSIVE_EQUIPMENT, **DEFENSIVE_EQUIPMENT}
 
 DEFAULT_EQUIPMENT = {k: 0 for k in ALL_EQUIPMENT.keys()}
+
+# ستون‌های جدیدی که در نسخه‌های بعدی به جدول users اضافه شدند.
+# این دیکشنری هم در init_db() برای مهاجرت دیتابیس فعلی استفاده می‌شود
+# و هم در document_handler() برای مهاجرت خودکار بکاپ‌های آپلودی قدیمی‌تر.
+NEW_USER_COLUMNS = {
+    "bank_last_interest": "INTEGER DEFAULT 0",
+    "nuke_last_research": "INTEGER DEFAULT 0",
+    "nuke_materials": "INTEGER DEFAULT 0",
+    "nuke_material_last_collect": "INTEGER DEFAULT 0",
+    "equipment_levels": "TEXT DEFAULT '{}'",
+    "equipment_variants": "TEXT DEFAULT '{}'",
+    "un_reputation": "INTEGER DEFAULT 100",
+    "oil_buildings": "TEXT DEFAULT '{\"oil_well\":0,\"oil_rig\":0}'",
+    "oil_last_collect": "INTEGER DEFAULT 0",
+    "last_group_attack": "INTEGER DEFAULT 0"
+}
 DEFAULT_VIP_BUILDINGS = {"hospital":0,"factory":0,"refinery":0,"university":0,"airport":0,"shelter_advanced":0}
 
 def init_db():
@@ -362,19 +378,7 @@ def init_db():
 
     # مهاجرت امن دیتابیس‌های قدیمی
     user_columns = {row[1] for row in c.execute("PRAGMA table_info(users)").fetchall()}
-    new_user_columns = {
-        "bank_last_interest": "INTEGER DEFAULT 0",
-        "nuke_last_research": "INTEGER DEFAULT 0",
-        "nuke_materials": "INTEGER DEFAULT 0",
-        "nuke_material_last_collect": "INTEGER DEFAULT 0",
-        "equipment_levels": "TEXT DEFAULT '{}'",
-        "equipment_variants": "TEXT DEFAULT '{}'",
-        "un_reputation": "INTEGER DEFAULT 100",
-        "oil_buildings": "TEXT DEFAULT '{\"oil_well\":0,\"oil_rig\":0}'",
-        "oil_last_collect": "INTEGER DEFAULT 0",
-        "last_group_attack": "INTEGER DEFAULT 0"
-    }
-    for col, definition in new_user_columns.items():
+    for col, definition in NEW_USER_COLUMNS.items():
         if col not in user_columns:
             c.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
 
@@ -5638,15 +5642,38 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if expected_cols and set(new_cols) != set(expected_cols):
             missing = set(expected_cols) - set(new_cols)
             extra = set(new_cols) - set(expected_cols)
-            os.remove(temp_path)
-            warn = "⚠️ ساختار جدول کاربران این دیتابیس با ربات فعلی یکی نیست و جایگزینی آن باعث خطا و قفل‌شدن مکرر دیتابیس (کند شدن کل ربات) می‌شود.\n"
+
+            # اگر ستون‌های کم، همون ستون‌های شناخته‌شده‌ای هستند که در نسخه‌های
+            # جدیدتر ربات به جدول users اضافه شدند، به‌جای رد کردن بکاپ، همین
+            # ستون‌ها را با مقدار پیش‌فرض به فایل آپلودی اضافه می‌کنیم (مهاجرت خودکار).
+            unknown_missing = missing - set(NEW_USER_COLUMNS.keys())
+
+            if unknown_missing:
+                os.remove(temp_path)
+                warn = "⚠️ ساختار جدول کاربران این دیتابیس با ربات فعلی یکی نیست و جایگزینی آن باعث خطا و قفل‌شدن مکرر دیتابیس (کند شدن کل ربات) می‌شود.\n"
+                warn += f"ستون‌های ناشناخته کم: {', '.join(sorted(unknown_missing))}\n"
+                if extra:
+                    warn += f"ستون‌های اضافه: {', '.join(sorted(extra))}\n"
+                warn += "لطفاً یک بکاپ سازگار با نسخه فعلی ربات ارسال کنید."
+                await status_msg.edit_text(warn)
+                return
+
             if missing:
-                warn += f"ستون‌های کم: {', '.join(sorted(missing))}\n"
-            if extra:
-                warn += f"ستون‌های اضافه: {', '.join(sorted(extra))}\n"
-            warn += "لطفاً یک بکاپ سازگار با نسخه فعلی ربات ارسال کنید."
-            await status_msg.edit_text(warn)
-            return
+                def migrate_uploaded_db():
+                    m_conn = sqlite3.connect(temp_path)
+                    try:
+                        m_c = m_conn.cursor()
+                        for col in missing:
+                            m_c.execute(f"ALTER TABLE users ADD COLUMN {col} {NEW_USER_COLUMNS[col]}")
+                        m_conn.commit()
+                    finally:
+                        m_conn.close()
+                await asyncio.to_thread(migrate_uploaded_db)
+                await status_msg.edit_text(
+                    f"🔄 {len(missing)} ستون قدیمی در بکاپ آپلودی پیدا شد و به‌طور خودکار با مقدار پیش‌فرض اضافه شد:\n"
+                    f"{', '.join(sorted(missing))}\n"
+                    "⏳ در حال ادامه فرآیند جایگزینی..."
+                )
 
         # بکاپ‌گیری از دیتابیس فعلی (روی ترد جدا، تا event loop مسدود نشود)
         backup_name = None
