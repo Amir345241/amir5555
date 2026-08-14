@@ -507,7 +507,10 @@ def create_user(user_id, country_name):
     conn = db_connect()
     try:
         c = conn.cursor()
-        c.execute('INSERT INTO users (user_id, country_name, equipment, vip_buildings, shares, peace_offers) VALUES (?, ?, ?, ?, ?, ?)',
+        # از INSERT OR IGNORE استفاده می‌کنیم تا اگر کاربر به هر دلیلی
+        # (مثلاً زدن دوباره /start قبل از پایان مکالمه، یا race condition)
+        # از قبل در دیتابیس وجود داشت، ربات کرش نکند.
+        c.execute('INSERT OR IGNORE INTO users (user_id, country_name, equipment, vip_buildings, shares, peace_offers) VALUES (?, ?, ?, ?, ?, ?)',
                   (user_id, country_name, json.dumps(DEFAULT_EQUIPMENT), json.dumps(DEFAULT_VIP_BUILDINGS), '{}', '{}'))
         conn.commit()
     finally:
@@ -1236,6 +1239,13 @@ async def receive_country_name(update: Update, context: ContextTypes.DEFAULT_TYP
     if not country_name:
         await update.message.reply_text("نام کشور نمی‌تواند خالی باشد. دوباره وارد کنید:")
         return COUNTRY_NAME
+    # اگر کاربر از قبل ثبت‌نام کرده (مثلاً دوباره /start زده یا این پیام
+    # تکراری رسیده)، دوباره ساختنش را رد می‌کنیم تا کرش نشود.
+    existing = get_user(user_id)
+    if existing:
+        await update.message.reply_text(f"✅ شما قبلاً با نام کشور {existing.get('country_name')} ثبت‌نام کرده‌اید.")
+        await show_main_menu(update, context)
+        return ConversationHandler.END
     create_user(user_id, country_name)
     await update.message.reply_text(f"✅ کشور {country_name} با موفقیت ثبت شد!\nشروع با ۱,۰۰۰ طلا و ۵۰۰ نفت")
     await show_main_menu(update, context)
