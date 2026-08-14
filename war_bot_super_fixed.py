@@ -34,6 +34,16 @@ COUNTRY_NAME, BET_AMOUNT, CLAN_NAME, DUEL_OPPONENT = range(4)
 # همون game.db کنار کد ساخته می‌شه (که با هر دیپلوی جدید روی Railway از بین می‌ره).
 DB_NAME = os.environ.get("DB_PATH", "game.db")
 
+# ========== تنظیمات اقتصادی/تولیدی جدید ==========
+BANK_INTEREST_COOLDOWN = 3600          # ۱ ساعت
+NUKE_RESEARCH_COOLDOWN = 3600         # ۱ ساعت
+NUKE_MATERIAL_COOLDOWN = 3600         # ۱ ساعت
+MAX_ECONOMY_LEVEL = 100
+MAX_TECH_LEVEL = 100
+MAX_POPULATION_LEVEL = 1000000
+EQUIPMENT_MAX_LEVEL = 20
+
+
 # مطمئن می‌شیم پوشه‌ی مقصد (مثلاً /data روی Volume ریلوی) از قبل وجود داره،
 # وگرنه sqlite3.connect با ارور "unable to open database file" مواجه می‌شه.
 _db_dir = os.path.dirname(DB_NAME)
@@ -347,6 +357,22 @@ def init_db():
     except:
         pass
 
+    # مهاجرت امن دیتابیس‌های قدیمی
+    user_columns = {row[1] for row in c.execute("PRAGMA table_info(users)").fetchall()}
+    new_user_columns = {
+        "bank_last_interest": "INTEGER DEFAULT 0",
+        "nuke_last_research": "INTEGER DEFAULT 0",
+        "nuke_materials": "INTEGER DEFAULT 0",
+        "nuke_material_last_collect": "INTEGER DEFAULT 0",
+        "equipment_levels": "TEXT DEFAULT '{}'",
+        "un_reputation": "INTEGER DEFAULT 100",
+        "oil_buildings": "TEXT DEFAULT '{\"oil_well\":0,\"oil_rig\":0}'",
+        "oil_last_collect": "INTEGER DEFAULT 0"
+    }
+    for col, definition in new_user_columns.items():
+        if col not in user_columns:
+            c.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+
     c.execute('SELECT COUNT(*) FROM npc_countries')
     if c.fetchone()[0] == 0:
         npcs = [
@@ -402,7 +428,15 @@ def get_user(user_id):
             "nuke_factory": row[46] or 0,
             "nuke_research": row[47] or 0,
             "terror_resistance": row[48] or 0,
-            "peace_offers": json.loads(row[49]) if row[49] else {}
+            "peace_offers": json.loads(row[49]) if row[49] else {},
+            "bank_last_interest": row[50] or 0 if len(row) > 50 else 0,
+            "nuke_last_research": row[51] or 0 if len(row) > 51 else 0,
+            "nuke_materials": row[52] or 0 if len(row) > 52 else 0,
+            "nuke_material_last_collect": row[53] or 0 if len(row) > 53 else 0,
+            "equipment_levels": json.loads(row[54]) if len(row) > 54 and row[54] else {},
+            "un_reputation": row[55] if len(row) > 55 and row[55] is not None else 100,
+            "oil_buildings": json.loads(row[56]) if len(row) > 56 and row[56] else {"oil_well":0,"oil_rig":0},
+            "oil_last_collect": row[57] or 0 if len(row) > 57 else 0
         }
     return None
 
@@ -429,7 +463,7 @@ def update_user(user_id, **kwargs):
     try:
         c = conn.cursor()
         for key, value in kwargs.items():
-            if key in ["equipment", "vip_buildings", "shares", "peace_offers"]:
+            if key in ["equipment", "vip_buildings", "shares", "peace_offers", "equipment_levels", "oil_buildings"]:
                 value = json.dumps(value)
             c.execute(f'UPDATE users SET {key} = ? WHERE user_id = ?', (value, user_id))
         conn.commit()
@@ -465,6 +499,31 @@ def update_npc(npc_id, **kwargs):
         conn.commit()
     finally:
         conn.close()
+
+def equipment_level_info(user, item_key):
+    levels = user.get("equipment_levels", {}) or {}
+    level = int(levels.get(item_key, 1))
+    return max(1, level)
+
+def equipment_upgrade_cost(item_key, user):
+    info = ALL_EQUIPMENT[item_key]
+    level = equipment_level_info(user, item_key)
+    return int(info["price"] * (1.35 ** (level - 1)))
+
+def apply_un_penalty(user_id, reason, fine, reputation_loss=10):
+    user = get_user(user_id)
+    if not user:
+        return
+    new_rep = max(0, user.get("un_reputation", 100) - reputation_loss)
+    update_user(user_id, gold=max(0, user["gold"] - fine), un_reputation=new_rep)
+    return new_rep
+
+def oil_production_per_hour(user):
+    b = user.get("oil_buildings", {}) or {}
+    return b.get("oil_well", 0) * 50 + b.get("oil_rig", 0) * 200
+
+def equipment_power_multiplier(user, item_key):
+    return 1 + (equipment_level_info(user, item_key) - 1) * 0.10
 
 def calculate_attack_power(equipment, army, tech, vip_buildings=None):
     power = army * 2
@@ -934,26 +993,19 @@ def format_casualties(losses):
 # ========== دکمه‌های منوی دسته‌بندی‌شده ==========
 def get_main_menu(user):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🌍 کشور من", style="primary", callback_data="my_country"),
-         InlineKeyboardButton("🎲 پول رایگان", style="success", callback_data="free_money")],
         [InlineKeyboardButton("🏛 سیاسی", style="primary", callback_data="political_menu"),
          InlineKeyboardButton("💰 اقتصادی", style="primary", callback_data="economic_menu"),
          InlineKeyboardButton("⚔️ نظامی", style="primary", callback_data="military_menu")],
-        [InlineKeyboardButton("🏰 کلن‌ها", style="primary", callback_data="clans"),
+        [InlineKeyboardButton("🌍 کشور من", style="primary", callback_data="my_country"),
          InlineKeyboardButton("📊 رتبه‌بندی", style="primary", callback_data="rankings"),
-         InlineKeyboardButton("🎁 هدیه روزانه", style="success", callback_data="daily_gift")],
-        [InlineKeyboardButton("🎯 ماموریت روزانه", style="primary", callback_data="daily_mission"),
-         InlineKeyboardButton("🎰 شرط‌بندی", style="primary", callback_data="betting"),
-         InlineKeyboardButton("⚔️ دوئل", style="danger", callback_data="duel")],
-        [InlineKeyboardButton("📈 بازار سهام", style="primary", callback_data="stock_market"),
-         InlineKeyboardButton("🗺️ شکار گنج", style="primary", callback_data="treasure_hunt"),
-         InlineKeyboardButton("⛏️ معدن‌کاوی", style="success", callback_data="mining")],
-        [InlineKeyboardButton("🎡 گردونه شانس", style="success", callback_data="lucky_wheel"),
-         InlineKeyboardButton("🏆 مسابقه گروهی", style="primary", callback_data="group_contest"),
-         InlineKeyboardButton("👥 دعوت دوستان", style="success", callback_data="referral")],
-        [InlineKeyboardButton("📰 روزنامه", style="primary", callback_data="newspaper"),
+         InlineKeyboardButton("📰 روزنامه", style="primary", callback_data="newspaper")],
+        [InlineKeyboardButton("🎁 هدیه روزانه", style="success", callback_data="daily_gift"),
+         InlineKeyboardButton("🎯 ماموریت روزانه", style="primary", callback_data="daily_mission"),
+         InlineKeyboardButton("🎰 شرط‌بندی", style="primary", callback_data="betting")],
+        [InlineKeyboardButton("🏆 مسابقه گروهی", style="primary", callback_data="group_contest"),
          InlineKeyboardButton("🎪 تورنمنت", style="primary", callback_data="tournament"),
          InlineKeyboardButton("🏅 دستاوردها", style="primary", callback_data="achievements")],
+        [InlineKeyboardButton("👥 دعوت دوستان", style="success", callback_data="referral")],
     ])
 
 def get_political_menu(user):
@@ -966,8 +1018,7 @@ def get_political_menu(user):
          InlineKeyboardButton("🏆 رتبه‌بندی‌ها", style="primary", callback_data="rankings")],
         [InlineKeyboardButton("🌍 رویداد جهانی", style="primary", callback_data="world_events"),
          InlineKeyboardButton("🕊️ گفتگوی محرمانه", style="primary", callback_data="secret_chat")],
-        [InlineKeyboardButton("🎖️ دستاوردها", style="primary", callback_data="achievements"),
-         InlineKeyboardButton("👥 زیرمجموعه‌گیری", style="success", callback_data="referral")],
+        [InlineKeyboardButton("🎖️ دستاوردها", style="primary", callback_data="achievements")],
         [InlineKeyboardButton("🕊️ پیمان صلح", style="success", callback_data="peace_menu"),
          InlineKeyboardButton("📋 وضعیت صلح", style="success", callback_data="peace_status")],
         [InlineKeyboardButton("🔙 بازگشت به منو", style="primary", callback_data="menu")]
@@ -1251,7 +1302,6 @@ async def arms_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     keyboard = []
-    # Offensive weapons - 2 per row
     off_keys = list(OFFENSIVE_EQUIPMENT.keys())
     for i in range(0, len(off_keys), 2):
         row = []
@@ -1259,15 +1309,11 @@ async def arms_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if i + j < len(off_keys):
                 key = off_keys[i+j]
                 info = OFFENSIVE_EQUIPMENT[key]
-                row.append(InlineKeyboardButton(f"{info['name']} ({info['price']:,} طلا)", style="primary", callback_data=f"buy_{key}"))
-        if row:
-            keyboard.append(row)
-
+                row.append(InlineKeyboardButton(info["name"], style="primary", callback_data=f"equip_panel_{key}"))
+        keyboard.append(row)
     keyboard.append([InlineKeyboardButton("➡️ سلاح‌های دفاعی", style="primary", callback_data="defense_market")])
     keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")])
-
-    text = f"🛒 بازار تسلیحات جنگی\n💰 طلا: {user['gold']:,}\n\n📋 سلاح‌های تهاجمی:"
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    await query.edit_message_text("🛒 بازار تسلیحات جنگی\n\nهر وسیله را انتخاب کنید تا مدل‌ها، تعداد خرید و ارتقا را ببینید.", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def defense_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -1276,7 +1322,6 @@ async def defense_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user:
         await query.edit_message_text("ابتدا /start کنید")
         return
-
     keyboard = []
     def_keys = list(DEFENSIVE_EQUIPMENT.keys())
     for i in range(0, len(def_keys), 2):
@@ -1284,45 +1329,89 @@ async def defense_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for j in range(2):
             if i + j < len(def_keys):
                 key = def_keys[i+j]
-                info = DEFENSIVE_EQUIPMENT[key]
-                row.append(InlineKeyboardButton(f"{info['name']} ({info['price']:,} طلا)", style="primary", callback_data=f"buy_{key}"))
-        if row:
-            keyboard.append(row)
-
+                row.append(InlineKeyboardButton(DEFENSIVE_EQUIPMENT[key]["name"], style="primary", callback_data=f"equip_panel_{key}"))
+        keyboard.append(row)
     keyboard.append([InlineKeyboardButton("⬅️ سلاح‌های جنگی", style="primary", callback_data="arms_market")])
     keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")])
+    await query.edit_message_text("🛡️ بازار تسلیحات دفاعی\n\nهر وسیله را انتخاب کنید تا مدل‌ها، تعداد خرید و ارتقا را ببینید.", reply_markup=InlineKeyboardMarkup(keyboard))
 
-    text = f"🛒 بازار تسلیحات دفاعی\n💰 طلا: {user['gold']:,}\n\n📋 سلاح‌های دفاعی:"
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def buy_equipment(update: Update, context: ContextTypes.DEFAULT_TYPE, item_key):
+async def equipment_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, item_key):
     query = update.callback_query
-    user_id = query.from_user.id
-    user = get_user(user_id)
-    if not user:
-        await query.answer("خطا!", show_alert=True)
-        return
-
+    await query.answer()
+    user = get_user(query.from_user.id)
     info = ALL_EQUIPMENT.get(item_key)
     if not info:
-        await query.answer("سلاح نامعتبر!", show_alert=True)
-        return
+        await query.answer("وسیله نامعتبر است!", show_alert=True); return
+    models = {
+        "fighters": ["✈️ F-35", "✈️ F-16", "✈️ Su-57"],
+        "tanks": ["🚜 Leopard 2", "🚜 M1 Abrams", "🚜 T-90"],
+        "ships": ["🚢 ناو هواپیمابر", "🚢 ناوشکن", "🚢 ناوچه"],
+        "missiles": ["🚀 بالستیک کوتاه‌برد", "🚀 بالستیک دوربرد", "🚀 هایپرسونیک"],
+        "attack_helicopters": ["🚁 AH-64", "🚁 Ka-52", "🚁 Tiger"],
+        "tactical_bombers": ["💣 F-15E", "💣 Su-34", "💣 B-1"],
+        "mi28": ["🇷🇺 Mi-28N", "🇷🇺 Mi-28NM"],
+        "puma_ifv": ["🇩🇪 Puma A", "🇩🇪 Puma B"],
+        "boxer_ifv": ["🇩🇪 Boxer APC", "🇩🇪 Boxer IFV"],
+        "tiger_heli": ["🇪🇺 Tiger UHT", "🇪🇺 Tiger HAD"],
+        "pzh2000": ["🇩🇪 PzH 2000 A", "🇩🇪 PzH 2000 B"],
+        "cruise_missiles": ["🚀 Tomahawk", "🚀 Storm Shadow", "🚀 کروز دوربرد"],
+        "defense": ["🛡️ دفاع پایه", "🛡️ دفاع شهری"],
+        "air_defense": ["🎯 سامانه کوتاه‌برد", "🎯 سامانه میان‌برد", "🎯 سامانه دوربرد"],
+        "s400": ["🇷🇺 S-400", "🇷🇺 S-400M"],
+        "patriot": ["🇺🇸 Patriot PAC-3", "🇺🇸 Patriot NG"],
+        "scout_drones": ["🚁 پهپاد شناسایی", "🚁 پهپاد پیشرفته"],
+        "advanced_radar": ["🎯 رادار پایه", "🎯 رادار آرایه‌فازی"],
+        "laser_shield": ["🛡️ لیزر دفاعی", "🛡️ لیزر پیشرفته"],
+        "abm_missiles": ["💣 ضدبالستیک پایه", "💣 ضدبالستیک پیشرفته"],
+        "ew_systems": ["🎯 جنگ الکترونیک پایه", "🎯 جنگ الکترونیک پیشرفته"],
+    }.get(item_key, [info["name"] + " مدل پایه", info["name"] + " مدل پیشرفته"])
+    level = equipment_level_info(user, item_key)
+    upgrade_cost = equipment_upgrade_cost(item_key, user)
+    buy_unit_price = int(info["price"] * (1 + (level-1)*0.10))
+    owned = user["equipment"].get(item_key, 0)
+    kb = [[InlineKeyboardButton(f"🛒 خرید ۱ عدد ({buy_unit_price:,} طلا)", style="success", callback_data=f"buyqty_{item_key}_1")],
+          [InlineKeyboardButton("🔢 خرید تعداد دلخواه", style="success", callback_data=f"buyqty_prompt_{item_key}")],
+          [InlineKeyboardButton(f"⬆️ ارتقای مدل/سطح {level} → {level+1} ({upgrade_cost:,})", style="primary", callback_data=f"upgrade_equip_{item_key}")]]
+    for idx, model in enumerate(models, 1):
+        kb.insert(1, [InlineKeyboardButton(f"{model} • مدل {idx}", style="primary", callback_data=f"model_{item_key}_{idx}")])
+    back = "defense_market" if item_key in DEFENSIVE_EQUIPMENT else "arms_market"
+    kb.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data=back)])
+    await query.edit_message_text(f"{info['name']}\n━━━━━━━━━━━━━━━━━━━━\n📦 موجودی: {owned}\n📈 سطح: {level}\n💰 قیمت پایه: {info['price']:,} طلا\n\nمدل موردنظر را انتخاب کنید یا تعداد خرید را وارد کنید:", reply_markup=InlineKeyboardMarkup(kb))
 
-    price = info["price"]
-    if user["gold"] < price:
-        await query.answer(f"طلای کافی ندارید! نیاز: {price:,}", show_alert=True)
-        return
+async def prompt_equipment_quantity(update, context, item_key):
+    query=update.callback_query
+    await query.answer()
+    context.user_data['waiting_for']='equipment_quantity'
+    context.user_data['equipment_key']=item_key
+    await query.edit_message_text("🔢 تعداد موردنظر را فقط به صورت عدد وارد کنید:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data=f"equip_panel_{item_key}")]]))
 
-    equip = user["equipment"]
-    equip[item_key] = equip.get(item_key, 0) + 1
-    new_gold = user["gold"] - price
+async def buy_equipment_quantity(update: Update, context: ContextTypes.DEFAULT_TYPE, item_key, amount):
+    query=update.callback_query
+    user=get_user(query.from_user.id); info=ALL_EQUIPMENT.get(item_key)
+    if not info or amount<=0 or amount>100000:
+        await query.answer("تعداد نامعتبر است!", show_alert=True); return
+    level=equipment_level_info(user,item_key)
+    unit=int(info["price"]*(1+(level-1)*0.10))
+    total=unit*amount
+    if user["gold"]<total:
+        await query.answer(f"طلای کافی ندارید! نیاز: {total:,}", show_alert=True); return
+    equip=user["equipment"].copy(); equip[item_key]=equip.get(item_key,0)+amount
+    update_user(query.from_user.id,gold=user["gold"]-total,equipment=equip)
+    await query.answer(f"✅ {amount} عدد خریداری شد",show_alert=True)
+    await equipment_panel(update,context,item_key)
 
-    update_user(user_id, gold=new_gold, equipment=equip)
-    await query.answer(f"✅ {info['name']} خریداری شد!", show_alert=True)
-    await query.edit_message_text(
-        f"✅ {info['name']} با موفقیت خریداری شد!\n💰 طلای باقی‌مانده: {new_gold:,}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به بازار", style="primary", callback_data="arms_market")]])
-    )
+async def upgrade_equipment(update: Update, context: ContextTypes.DEFAULT_TYPE, item_key):
+    query=update.callback_query; user=get_user(query.from_user.id)
+    level=equipment_level_info(user,item_key)
+    if level>=EQUIPMENT_MAX_LEVEL:
+        await query.answer("حداکثر سطح این وسیله رسیده‌اید!",show_alert=True); return
+    cost=equipment_upgrade_cost(item_key,user)
+    if user["gold"]<cost:
+        await query.answer(f"طلای کافی ندارید! نیاز: {cost:,}",show_alert=True); return
+    levels=user.get("equipment_levels",{}).copy(); levels[item_key]=level+1
+    update_user(query.from_user.id,gold=user["gold"]-cost,equipment_levels=levels)
+    await query.answer("✅ ارتقا انجام شد؛ قیمت خرید هم افزایش یافت.",show_alert=True)
+    await equipment_panel(update,context,item_key)
 
 # ========== سپر دفاعی ==========
 async def shield_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2002,65 +2091,37 @@ async def secret_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== اقتصادی - بانک ==========
 async def bank_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user = get_user(query.from_user.id)
-    if not user:
-        await query.edit_message_text("ابتدا /start کنید")
-        return
-    interest = int(user.get("bank_gold", 0) * 0.05)
-    await query.edit_message_text(
-        f"🏦 بانک مرکزی\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"💰 طلای شما: {user['gold']:,}\n"
-        f"🏦 سپرده بانکی: {user.get('bank_gold', 0):,}\n"
-        f"📈 سود روزانه: {interest:,} طلا (۵٪)\n"
-        f"💡 سپرده‌گذاری در بانک از غارت حملات محافظت می‌کند!\n\n"
-        f"📋 انتخاب کنید:",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("💰 واریز به بانک", style="success", callback_data="bank_deposit"),
-             InlineKeyboardButton("💸 برداشت از بانک", style="primary", callback_data="bank_withdraw")],
-            [InlineKeyboardButton("📈 دریافت سود", style="success", callback_data="bank_interest")],
-            [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="economic_menu")]
-        ])
-    )
+    query=update.callback_query; await query.answer(); user=get_user(query.from_user.id)
+    now=int(time.time()); last=user.get("bank_last_interest",0); remaining=max(0,BANK_INTEREST_COOLDOWN-(now-last))
+    interest=int(user.get("bank_gold",0)*0.05)
+    ready=remaining==0 and interest>0
+    text=(f"🏦 بانک مرکزی\n━━━━━━━━━━━━━━━━━━━━\n💰 طلای شما: {user['gold']:,}\n🏦 سپرده: {user.get('bank_gold',0):,}\n📈 سود هر برداشت: {interest:,} طلا (۵٪)\n")
+    text += f"\n{'✅ سود آماده دریافت است!' if ready else '⏳ تا دریافت سود بعدی: '+format_time_remaining(remaining)}"
+    kb=[[InlineKeyboardButton("💰 واریز به بانک",style="success",callback_data="bank_deposit"),InlineKeyboardButton("💸 برداشت از بانک",style="primary",callback_data="bank_withdraw")],
+        [InlineKeyboardButton("📈 دریافت سود",style="success",callback_data="bank_interest")],
+        [InlineKeyboardButton("🔙 بازگشت",style="primary",callback_data="economic_menu")]]
+    await query.edit_message_text(text,reply_markup=InlineKeyboardMarkup(kb))
 
-async def bank_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_text(
-        "💰 مقدار طلا برای واریز به بانک را وارد کنید:",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="bank_menu")]])
-    )
-    context.user_data['waiting_for'] = 'bank_deposit'
+async def bank_deposit(update, context):
+    query=update.callback_query; await query.answer(); context.user_data['waiting_for']='bank_deposit'
+    await query.edit_message_text("💰 مقدار طلا برای واریز به بانک را وارد کنید:",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف",style="primary",callback_data="bank_menu")]]))
 
-async def bank_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_text(
-        "💸 مقدار طلا برای برداشت از بانک را وارد کنید:",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="bank_menu")]])
-    )
-    context.user_data['waiting_for'] = 'bank_withdraw'
+async def bank_withdraw(update, context):
+    query=update.callback_query; await query.answer(); context.user_data['waiting_for']='bank_withdraw'
+    await query.edit_message_text("💸 مقدار طلا برای برداشت از بانک را وارد کنید:",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف",style="primary",callback_data="bank_menu")]]))
 
-async def bank_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    user_id = query.from_user.id
-    user = get_user(user_id)
-    interest = int(user.get("bank_gold", 0) * 0.05)
-    if interest <= 0:
-        await query.answer("سپرده‌ای ندارید!", show_alert=True)
-        return
-    new_bank = user.get("bank_gold", 0) + interest
-    update_user(user_id, bank_gold=new_bank)
-    await query.answer(f"✅ {interest:,} طلا سود دریافت شد!", show_alert=True)
-    await query.edit_message_text(
-        f"📈 سود دریافت شد!\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"💰 سود: {interest:,} طلا\n"
-        f"🏦 موجودی بانک: {new_bank:,}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="bank_menu")]])
-    )
+async def bank_interest(update, context):
+    query=update.callback_query; user_id=query.from_user.id; user=get_user(user_id); now=int(time.time())
+    last=user.get("bank_last_interest",0)
+    if now-last<BANK_INTEREST_COOLDOWN:
+        await query.answer(f"⏳ هنوز زمان دریافت سود نرسیده: {format_time_remaining(BANK_INTEREST_COOLDOWN-(now-last))}",show_alert=True); return
+    interest=int(user.get("bank_gold",0)*0.05)
+    if interest<=0:
+        await query.answer("سپرده‌ای ندارید!",show_alert=True); return
+    new_bank=user.get("bank_gold",0)+interest
+    update_user(user_id,bank_gold=new_bank,bank_last_interest=now)
+    await query.answer(f"✅ {interest:,} طلا سود دریافت شد!",show_alert=True)
+    await bank_menu(update,context)
 
 # ========== اقتصادی - شرکت‌ها ==========
 async def companies(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2075,7 +2136,7 @@ async def companies(update: Update, context: ContextTypes.DEFAULT_TYPE):
     last = user.get("last_company_time", 0)
     cooldown = 3600
     can_collect = now - last >= cooldown
-    income = user["economy"] * 50
+    income = user["economy"] * 50 + user["population"] * 2 + user["tech"] * 10
 
     keyboard = [
         [InlineKeyboardButton(f"💰 دریافت درآمد ({income:,} طلا)", style="success", callback_data="company_collect")] if can_collect else [],
@@ -2106,7 +2167,7 @@ async def company_collect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if now - user.get("last_company_time", 0) < 3600:
         await query.answer("⏳ هنوز زمان نرسیده!", show_alert=True)
         return
-    income = user["economy"] * 50
+    income = user["economy"] * 50 + user["population"] * 2 + user["tech"] * 10
     update_user(user_id, gold=user["gold"] + income, last_company_time=now)
     await query.answer(f"✅ {income:,} طلا دریافت شد!", show_alert=True)
     await query.edit_message_text(
@@ -2126,22 +2187,22 @@ async def trade(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("ابتدا /start کنید")
         return
 
-    oil_price = random.randint(8, 15)
-    gold_price = random.randint(95, 105)
+    oil_price = random.randint(10, 20)
+    context.user_data['oil_trade_price'] = oil_price
 
     await query.edit_message_text(
         f"📦 مرکز تجارت\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"📈 نرخ‌های امروز:\n"
         f"🛢️ نفت: {oil_price} طلا / واحد\n"
-        f"💰 طلا: {gold_price} نفت / واحد\n\n"
+        f"💰 خرید و فروش: {oil_price} طلا / هر ۱ نفت\n\n"
         f"💰 طلای شما: {user['gold']:,}\n"
         f"🛢️ نفت شما: {user['oil']:,}\n\n"
         f"📋 انتخاب کنید:",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton(f"🛢️ فروش ۱۰۰ نفت ({100*oil_price:,} طلا)", style="primary", callback_data="trade_sell_100")],
             [InlineKeyboardButton(f"🛢️ فروش ۵۰۰ نفت ({500*oil_price:,} طلا)", style="primary", callback_data="trade_sell_500")],
-            [InlineKeyboardButton(f"💰 خرید ۱۰۰ نفت ({int(100/gold_price*100):,} طلا)", style="success", callback_data="trade_buy_100")],
+            [InlineKeyboardButton(f"💰 خرید ۱۰۰ نفت ({100*oil_price:,} طلا)", style="success", callback_data="trade_buy_100")],
             [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="economic_menu")]
         ])
     )
@@ -2150,7 +2211,7 @@ async def trade_action(update: Update, context: ContextTypes.DEFAULT_TYPE, actio
     query = update.callback_query
     user_id = query.from_user.id
     user = get_user(user_id)
-    oil_price = random.randint(8, 15)
+    oil_price = context.user_data.get('oil_trade_price', random.randint(10, 20))
 
     if action == "sell":
         if user["oil"] < amount:
@@ -2167,7 +2228,7 @@ async def trade_action(update: Update, context: ContextTypes.DEFAULT_TYPE, actio
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="trade")]])
         )
     else:
-        cost = int(amount / oil_price * 100) // 100
+        cost = amount * oil_price
         if user["gold"] < cost:
             await query.answer("طلای کافی ندارید!", show_alert=True)
             return
@@ -2230,107 +2291,39 @@ async def sell_oil(update: Update, context: ContextTypes.DEFAULT_TYPE, amount):
 
 # ========== نظامی - دانشمندان و کارخانه هسته‌ای ==========
 async def nuke_scientists_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user = get_user(query.from_user.id)
-    if not user:
-        await query.edit_message_text("ابتدا /start کنید")
-        return
+    query=update.callback_query; await query.answer(); user=get_user(query.from_user.id); now=int(time.time())
+    current=user.get('nuke_research',0); last=user.get('nuke_last_research',0); remaining=max(0,NUKE_RESEARCH_COOLDOWN-(now-last))
+    await query.edit_message_text(f"🧪 مرکز دانشمندان هسته‌ای\n━━━━━━━━━━━━━━━━━━━━\n👨‍🔬 دانشمندان: {user.get('nuke_scientists',0)}\n📊 تحقیق: {current}/100\n☢️ سلاح هسته‌ای: {'دارد' if user['nuke'] else 'ندارد'}\n💰 استخدام هر دانشمند: ۵۰,۰۰۰ طلا\n\n{'✅ تحقیق آماده دریافت است.' if remaining==0 else '⏳ دریافت بعدی: '+format_time_remaining(remaining)}",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("👨‍🔬 استخدام دانشمند",style="success",callback_data="hire_scientist")],[InlineKeyboardButton("📈 دریافت تحقیق",style="success",callback_data="collect_research")],[InlineKeyboardButton("🔙 بازگشت",style="primary",callback_data="military_menu")]]))
 
-    research_needed = 100
-    current = user.get("nuke_research", 0)
+async def hire_scientist(update, context):
+    query=update.callback_query; user=get_user(query.from_user.id); cost=50000
+    if user['gold']<cost: await query.answer('طلای کافی ندارید!',show_alert=True); return
+    update_user(query.from_user.id,gold=user['gold']-cost,nuke_scientists=user.get('nuke_scientists',0)+1); await query.answer('✅ دانشمند استخدام شد!',show_alert=True); await nuke_scientists_menu(update,context)
 
-    await query.edit_message_text(
-        f"🧪 مرکز دانشمندان هسته‌ای\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👨‍🔬 دانشمندان استخدام‌شده: {user.get('nuke_scientists', 0)}\n"
-        f"📊 پیشرفت تحقیقات: {current}/{research_needed}\n"
-        f"☢️ سلاح هسته‌ای: {'دارد' if user['nuke'] else 'ندارد'}\n"
-        f"💰 هزینه استخدام هر دانشمند: ۵۰,۰۰۰ طلا\n"
-        f"💰 طلای شما: {user['gold']:,}\n\n"
-        f"📋 هر دانشمند هر ساعت ۱ واحد تحقیق تولید می‌کند.",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("👨‍🔬 استخدام دانشمند", style="success", callback_data="hire_scientist")],
-            [InlineKeyboardButton("📈 دریافت تحقیق", style="success", callback_data="collect_research")],
-            [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")]
-        ])
-    )
-
-async def hire_scientist(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    user_id = query.from_user.id
-    user = get_user(user_id)
-    cost = 50000
-    if user["gold"] < cost:
-        await query.answer("طلای کافی ندارید!", show_alert=True)
-        return
-    update_user(user_id, gold=user["gold"] - cost, nuke_scientists=user.get("nuke_scientists", 0) + 1)
-    await query.answer("✅ دانشمند استخدام شد!", show_alert=True)
-    await nuke_scientists_menu(update, context)
-
-async def collect_research(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    user_id = query.from_user.id
-    user = get_user(user_id)
-    scientists = user.get("nuke_scientists", 0)
-    if scientists == 0:
-        await query.answer("دانشمندی ندارید!", show_alert=True)
-        return
-    new_research = user.get("nuke_research", 0) + scientists
-    nuke_acquired = False
-    if new_research >= 100 and not user["nuke"]:
-        new_research = 0
-        nuke_acquired = True
-        update_user(user_id, nuke_research=new_research, nuke=True)
-    else:
-        update_user(user_id, nuke_research=new_research)
-
-    msg = f"📈 {scientists} واحد تحقیق دریافت شد!\n📊 پیشرفت: {new_research}/100"
-    if nuke_acquired:
-        msg = "☢️ تبریک! سلاح هسته‌ای ساخته شد!"
-    await query.answer(msg.split("\n")[0], show_alert=True)
-    await query.edit_message_text(
-        msg,
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="nuke_scientists_menu")]])
-    )
+async def collect_research(update, context):
+    query=update.callback_query; user_id=query.from_user.id; user=get_user(user_id); now=int(time.time()); scientists=user.get('nuke_scientists',0)
+    if scientists==0: await query.answer('دانشمندی ندارید!',show_alert=True); return
+    if now-user.get('nuke_last_research',0)<NUKE_RESEARCH_COOLDOWN:
+        await query.answer('⏳ هنوز زمان دریافت تحقیق نرسیده!',show_alert=True); return
+    new_research=min(100,user.get('nuke_research',0)+scientists)
+    acquired=new_research>=100 and not user['nuke']
+    update_user(user_id,nuke_research=0 if acquired else new_research,nuke=True if acquired else user['nuke'],nuke_last_research=now)
+    await query.answer('☢️ سلاح هسته‌ای ساخته شد!' if acquired else f'📈 {scientists} واحد تحقیق دریافت شد!',show_alert=True); await nuke_scientists_menu(update,context)
 
 async def nuke_factory_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user = get_user(query.from_user.id)
-    if not user:
-        await query.edit_message_text("ابتدا /start کنید")
-        return
+    query=update.callback_query; await query.answer(); user=get_user(query.from_user.id); now=int(time.time()); last=user.get('nuke_material_last_collect',0); remaining=max(0,NUKE_MATERIAL_COOLDOWN-(now-last)); level=user.get('nuke_factory',0); produced=level*10
+    await query.edit_message_text(f"🏭 کارخانه مواد هسته‌ای\n━━━━━━━━━━━━━━━━━━━━\n🏭 سطح کارخانه: {level}\n☢️ مواد ذخیره‌شده: {user.get('nuke_materials',0)}\n⚡ تولید هر ساعت: {produced} واحد\n💰 هزینه ارتقا: {100000*(level+1):,} طلا\n\n{'✅ تولید آماده برداشت است.' if level and remaining==0 else ('⏳ برداشت بعدی: '+format_time_remaining(remaining) if level else '⚠️ ابتدا کارخانه را ارتقا دهید.')}",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('📦 برداشت مواد تولیدشده',style='success',callback_data='collect_nuke_materials')],[InlineKeyboardButton(f'🏭 ارتقا ({100000*(level+1):,} طلا)',style='primary',callback_data='upgrade_factory')],[InlineKeyboardButton('🔙 بازگشت',style='primary',callback_data='military_menu')]]))
 
-    factory_level = user.get("nuke_factory", 0)
-    cost = 100000 * (factory_level + 1)
+async def collect_nuke_materials(update, context):
+    query=update.callback_query; user=get_user(query.from_user.id); now=int(time.time()); level=user.get('nuke_factory',0)
+    if level<=0: await query.answer('کارخانه‌ای ندارید!',show_alert=True); return
+    if now-user.get('nuke_material_last_collect',0)<NUKE_MATERIAL_COOLDOWN: await query.answer('⏳ هنوز تولید آماده نیست!',show_alert=True); return
+    amount=level*10; update_user(query.from_user.id,nuke_materials=user.get('nuke_materials',0)+amount,nuke_material_last_collect=now); await query.answer(f'📦 {amount} واحد مواد هسته‌ای برداشت شد!',show_alert=True); await nuke_factory_menu(update,context)
 
-    await query.edit_message_text(
-        f"🏭 کارخانه هسته‌ای\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🏭 سطح کارخانه: {factory_level}\n"
-        f"⚡ تولید مواد هسته‌ای: {factory_level * 10}/ساعت\n"
-        f"💰 هزینه ارتقا: {cost:,} طلا\n"
-        f"💰 طلای شما: {user['gold']:,}\n\n"
-        f"📋 کارخانه مواد هسته‌ای برای حملات اتمی تولید می‌کند.",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton(f"🏭 ارتقا ({cost:,} طلا)", style="success", callback_data="upgrade_factory")],
-            [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")]
-        ])
-    )
-
-async def upgrade_factory(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    user_id = query.from_user.id
-    user = get_user(user_id)
-    factory_level = user.get("nuke_factory", 0)
-    cost = 100000 * (factory_level + 1)
-    if user["gold"] < cost:
-        await query.answer("طلای کافی ندارید!", show_alert=True)
-        return
-    update_user(user_id, gold=user["gold"] - cost, nuke_factory=factory_level + 1)
-    await query.answer("✅ کارخانه ارتقا یافت!", show_alert=True)
-    await nuke_factory_menu(update, context)
+async def upgrade_factory(update, context):
+    query=update.callback_query; user=get_user(query.from_user.id); level=user.get('nuke_factory',0); cost=100000*(level+1)
+    if user['gold']<cost: await query.answer('طلای کافی ندارید!',show_alert=True); return
+    update_user(query.from_user.id,gold=user['gold']-cost,nuke_factory=level+1); await query.answer('✅ کارخانه ارتقا یافت!',show_alert=True); await nuke_factory_menu(update,context)
 
 # ========== نظامی - امنیت و ترور ==========
 async def security_terror(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2878,7 +2871,9 @@ async def execute_nuke(update: Update, context: ContextTypes.DEFAULT_TYPE, targe
     damage_oil = int(target["oil"] * 0.5)
 
     update_user(target_id, gold=max(0, target["gold"] - damage_gold), oil=max(0, target["oil"] - damage_oil))
-    update_user(user_id, nuke=False)
+    # حمله اتمی تخلف سنگین تلقی می‌شود و سازمان ملل جریمه می‌کند.
+    un_fine = max(10000, int(user["gold"] * 0.10))
+    update_user(user_id, nuke=False, gold=max(0, user["gold"] - un_fine), un_reputation=max(0, user.get("un_reputation",100)-25))
 
     await query.edit_message_text(
         f"☢️ حمله اتمی انجام شد!\n"
@@ -2886,7 +2881,7 @@ async def execute_nuke(update: Update, context: ContextTypes.DEFAULT_TYPE, targe
         f"🎯 هدف: {target['country_name']}\n"
         f"💰 خسارت طلا: {damage_gold:,}\n"
         f"🛢️ خسارت نفت: {damage_oil:,}\n"
-        f"⚠️ سلاح هسته‌ای شما مصرف شد!",
+        f"⚠️ سلاح هسته‌ای شما مصرف شد!\n🌐 جریمه سازمان ملل: {un_fine:,} طلا",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")]])
     )
     try:
@@ -2900,81 +2895,46 @@ async def execute_nuke(update: Update, context: ContextTypes.DEFAULT_TYPE, targe
 
 # ========== پروژه‌های ملی ==========
 async def national_projects(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    user = get_user(user_id)
-    if not user:
-        await query.edit_message_text("ابتدا /start کنید")
-        return
+    query=update.callback_query; await query.answer(); user=get_user(query.from_user.id); b=user.get('oil_buildings',{}) or {}
+    econ_cost=500*(user['economy']+1)//10; tech_cost=500*(user['tech']+1)//5; pop_cost=300*(1+user['population']//10000)
+    kb=[[InlineKeyboardButton(f'🏭 اقتصاد +5 ({econ_cost:,})',style='success',callback_data='project_economy'),InlineKeyboardButton(f'🔬 فناوری +5 ({tech_cost:,})',style='success',callback_data='project_tech')],[InlineKeyboardButton(f'👥 جمعیت +100 ({pop_cost:,})',style='success',callback_data='project_population')],[InlineKeyboardButton('🛢️ چاه نفت',style='primary',callback_data='oil_build_well'),InlineKeyboardButton('🛢️ سکوی نفتی',style='primary',callback_data='oil_build_rig')],[InlineKeyboardButton('📦 برداشت نفت تولیدشده',style='success',callback_data='collect_oil')],[InlineKeyboardButton('🏗️ سلاح هسته‌ای (۵,۰۰۰ طلا)',style='primary',callback_data='project_nuke'),InlineKeyboardButton('🏠 پناهگاه (۱,۰۰۰)',style='primary',callback_data='project_shelter')],[InlineKeyboardButton('⚔️ توسعه ارتش (۴۰۰ طلا)',style='success',callback_data='project_army')]]
+    kb.append([InlineKeyboardButton('🔙 بازگشت',style='primary',callback_data='economic_menu')])
+    prod=oil_production_per_hour(user); rem=max(0,3600-(int(time.time())-user.get('oil_last_collect',0)))
+    await query.edit_message_text(f"🏗️ پروژه‌های ملی\n━━━━━━━━━━━━━━━━━━━━\n💰 طلا: {user['gold']:,}\n🏭 اقتصاد: {user['economy']}/{MAX_ECONOMY_LEVEL}\n🔬 فناوری: {user['tech']}/{MAX_TECH_LEVEL}\n👥 جمعیت: {user['population']:,}\n🛢️ چاه نفت: {b.get('oil_well',0)} | سکوی نفتی: {b.get('oil_rig',0)}\n🛢️ تولید نفت: {prod}/ساعت\n⏳ برداشت نفت: {'آماده' if rem==0 and prod else format_time_remaining(rem)}",reply_markup=InlineKeyboardMarkup(kb))
 
-    keyboard = [
-        [InlineKeyboardButton("🏭 توسعه اقتصاد (۵۰۰ طلا)", style="success", callback_data="project_economy"),
-         InlineKeyboardButton("🔬 توسعه فناوری (۵۰۰ طلا)", style="success", callback_data="project_tech")],
-        [InlineKeyboardButton("👥 افزایش جمعیت (۳۰۰ طلا)", style="success", callback_data="project_population"),
-         InlineKeyboardButton("☢️ سلاح هسته‌ای (۵,۰۰۰ طلا)", style="primary", callback_data="project_nuke")],
-        [InlineKeyboardButton("🏠 پناهگاه اتمی (۱,۰۰۰ طلا)", style="primary", callback_data="project_shelter"),
-         InlineKeyboardButton("⚔️ توسعه ارتش (۴۰۰ طلا)", style="success", callback_data="project_army")],
-    ]
-    if user["is_vip"]:
-        keyboard.append([InlineKeyboardButton("👑 خرید VIP (۲۰,۰۰۰,۰۰۰ طلا)", style="success", callback_data="buy_vip")])
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="economic_menu")])
+async def execute_project(update, context, project, cost):
+    query=update.callback_query; user_id=query.from_user.id; user=get_user(user_id)
+    if project=='economy': cost=500*(user['economy']+1)//10;
+    elif project=='tech': cost=500*(user['tech']+1)//5
+    elif project=='population': cost=300*(1+user['population']//10000)
+    if user['gold']<cost: await query.answer(f'طلای کافی ندارید! نیاز: {cost:,}',show_alert=True); return
+    updates={'gold':user['gold']-cost}
+    if project=='economy':
+        if user['economy']>=MAX_ECONOMY_LEVEL: await query.answer('حداکثر سطح اقتصاد رسید!',show_alert=True); return
+        updates['economy']=user['economy']+5; msg=f'🏭 اقتصاد به {updates["economy"]} رسید.'
+    elif project=='tech':
+        if user['tech']>=MAX_TECH_LEVEL: await query.answer('حداکثر سطح فناوری رسید!',show_alert=True); return
+        updates['tech']=user['tech']+5; msg=f'🔬 فناوری به {updates["tech"]} رسید.'
+    elif project=='population': updates['population']=min(MAX_POPULATION_LEVEL,user['population']+100); msg=f'👥 جمعیت به {updates["population"]:,} رسید.'
+    elif project=='nuke':
+        if user['nuke']: await query.answer('شما قبلاً سلاح هسته‌ای دارید!',show_alert=True); return
+        updates['nuke']=True; msg='☢️ سلاح هسته‌ای ساخته شد.'
+    elif project=='shelter':
+        if user['shelter']: await query.answer('پناهگاه را قبلاً ساخته‌اید!',show_alert=True); return
+        updates['shelter']=True; msg='🏠 پناهگاه اتمی ساخته شد.'
+    elif project=='army': updates['army']=user['army']+3; msg=f'⚔️ ارتش به {updates["army"]} رسید.'
+    update_user(user_id,**updates); await query.answer('✅ پروژه تکمیل شد!',show_alert=True); await national_projects(update,context)
 
-    await query.edit_message_text(
-        f"🏗️ پروژه‌های ملی\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"💰 طلا: {user['gold']:,}\n"
-        f"📊 اقتصاد: {user['economy']}\n"
-        f"🔬 فناوری: {user['tech']}\n"
-        f"👥 جمعیت: {user['population']:,}\n"
-        f"☢️ سلاح هسته‌ای: {'دارد' if user['nuke'] else 'ندارد'}\n"
-        f"🏠 پناهگاه: {'دارد' if user['shelter'] else 'ندارد'}\n"
-        f"👑 VIP: {'بله' if user['is_vip'] else 'خیر'}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📋 پروژه‌های قابل اجرا:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+async def oil_building_action(update, context, kind):
+    query=update.callback_query; user=get_user(query.from_user.id); b=user.get('oil_buildings',{}).copy(); level=b.get(kind,0); cost=(10000 if kind=='oil_well' else 50000)*(level+1)
+    if user['gold']<cost: await query.answer(f'طلای کافی ندارید! نیاز: {cost:,}',show_alert=True); return
+    b[kind]=level+1; update_user(query.from_user.id,gold=user['gold']-cost,oil_buildings=b); await query.answer('✅ ساختمان نفتی ساخته/ارتقا یافت!',show_alert=True); await national_projects(update,context)
 
-async def execute_project(update: Update, context: ContextTypes.DEFAULT_TYPE, project, cost):
-    query = update.callback_query
-    user_id = query.from_user.id
-    user = get_user(user_id)
-    if user["gold"] < cost:
-        await query.answer(f"طلای کافی ندارید! نیاز: {cost:,}", show_alert=True)
-        return
-    new_gold = user["gold"] - cost
-    updates = {"gold": new_gold}
-    msg = ""
-    if project == "economy":
-        updates["economy"] = user["economy"] + 5
-        msg = f"🏭 اقتصاد به {user['economy'] + 5} افزایش یافت!"
-    elif project == "tech":
-        updates["tech"] = user["tech"] + 5
-        msg = f"🔬 فناوری به {user['tech'] + 5} افزایش یافت!"
-    elif project == "population":
-        updates["population"] = user["population"] + 100
-        msg = f"👥 جمعیت به {user['population'] + 100} افزایش یافت!"
-    elif project == "nuke":
-        if user["nuke"]:
-            await query.answer("شما قبلاً سلاح هسته‌ای دارید!", show_alert=True)
-            return
-        updates["nuke"] = True
-        msg = "☢️ سلاح هسته‌ای ساخته شد!"
-    elif project == "shelter":
-        if user["shelter"]:
-            await query.answer("شما قبلاً پناهگاه دارید!", show_alert=True)
-            return
-        updates["shelter"] = True
-        msg = "🏠 پناهگاه اتمی ساخته شد!"
-    elif project == "army":
-        updates["army"] = user["army"] + 3
-        msg = f"⚔️ ارتش به {user['army'] + 3} افزایش یافت!"
-    update_user(user_id, **updates)
-    await query.answer("✅ پروژه تکمیل شد!", show_alert=True)
-    await query.edit_message_text(
-        f"✅ {msg}\n💰 طلای باقی‌مانده: {new_gold:,}",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به پروژه‌ها", style="primary", callback_data="national_projects")]])
-    )
+async def collect_oil(update, context):
+    query=update.callback_query; user=get_user(query.from_user.id); now=int(time.time()); prod=oil_production_per_hour(user)
+    if prod<=0: await query.answer('ابتدا ساختمان برداشت نفت بسازید!',show_alert=True); return
+    if now-user.get('oil_last_collect',0)<3600: await query.answer('⏳ هنوز زمان برداشت نفت نرسیده!',show_alert=True); return
+    update_user(query.from_user.id,oil=user['oil']+prod,oil_last_collect=now); await query.answer(f'🛢️ {prod} نفت برداشت شد!',show_alert=True); await national_projects(update,context)
 
 async def buy_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -3043,6 +3003,8 @@ async def black_market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE, i
         await query.answer(f"طلای کافی ندارید! نیاز: {price}", show_alert=True)
         return
     new_gold = user["gold"] - price
+    caught = random.random() < 0.50
+    fine = max(500, price * 3) if caught else 0
     if "weapon" in item:
         equip = user["equipment"].copy()
         equip["soldiers"] = equip.get("soldiers", 0) + 10
@@ -3064,8 +3026,11 @@ async def black_market_buy(update: Update, context: ContextTypes.DEFAULT_TYPE, i
         msg = "🚁 ۲ پهپاد قاچاق دریافت کردید!"
     else:
         msg = "✅ خرید انجام شد!"
+    if caught:
+        apply_un_penalty(user_id, "قاچاق در بازار سیاه", fine, 8)
+        msg += f"\n🚨 سازمان ملل شما را شناسایی کرد! جریمه: {fine:,} طلا"
     await query.edit_message_text(
-        f"✅ خرید قاچاق موفق!\n━━━━━━━━━━━━━━━━━━━━\n{msg}\n💰 طلای باقی‌مانده: {new_gold:,}",
+        f"✅ خرید قاچاق موفق!\n━━━━━━━━━━━━━━━━━━━━\n{msg}\n💰 طلای باقی‌مانده: {max(0,new_gold-fine):,}",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به بازار سیاه", style="primary", callback_data="black_market")]])
     )
 
@@ -3253,16 +3218,30 @@ async def clan_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     conn = db_connect()
     c = conn.cursor()
-    c.execute('SELECT name, owner_id, level, wins FROM clans ORDER BY level DESC LIMIT 10')
+    c.execute('SELECT id, name, owner_id, level, wins FROM clans ORDER BY level DESC LIMIT 10')
     rows = c.fetchall()
     conn.close()
     if not rows:
         await query.edit_message_text("❌ هیچ کلنی وجود ندارد!")
         return
     text = "🏰 لیست کلن‌ها\n━━━━━━━━━━━━━━━━━━━━\n\n"
+    keyboard=[]
     for i, row in enumerate(rows, 1):
-        text += f"{i}. {row[0]}\n👤 رهبر: {row[1]}\n📈 سطح: {row[2]} | 🏆 برد: {row[3]}\n━━━━━━━━━━━━━━━━━━━━\n"
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="clans")]]))
+        text += f"{i}. {row[1]}\n👤 رهبر: {row[2]}\n📈 سطح: {row[3]} | 🏆 برد: {row[4]}\n━━━━━━━━━━━━━━━━━━━━\n"
+        keyboard.append([InlineKeyboardButton(f"➕ عضویت در {row[1]}", style="success", callback_data=f"clan_join_{row[0]}")])
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="clans")])
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def clan_join(update: Update, context: ContextTypes.DEFAULT_TYPE, clan_id):
+    query=update.callback_query; user_id=query.from_user.id; user=get_user(user_id)
+    conn=db_connect(); c=conn.cursor(); c.execute('SELECT name FROM clans WHERE id=?',(int(clan_id),)); row=c.fetchone(); conn.close()
+    clan_name=row[0] if row else None; clan=get_clan(clan_name) if clan_name else None
+    if not clan: await query.answer('کلن پیدا نشد!',show_alert=True); return
+    if user.get('clan'): await query.answer('ابتدا از کلن فعلی خارج شوید!',show_alert=True); return
+    members=clan['members']
+    if user_id in members: await query.answer('شما عضو این کلن هستید!',show_alert=True); return
+    members.append(user_id); update_clan(clan_name,members=members); update_user(user_id,clan=clan_name)
+    await query.answer('✅ با موفقیت عضو کلن شدید!',show_alert=True); await clans(update,context)
 
 async def clan_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -4084,6 +4063,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await arms_market(update, context)
     elif data == "defense_market":
         await defense_market(update, context)
+    elif data.startswith("equip_panel_"):
+        await equipment_panel(update, context, data[len("equip_panel_"):])
+    elif data.startswith("buyqty_") and not data.startswith("buyqty_prompt_"):
+        parts=data.split("_"); await buy_equipment_quantity(update,context,parts[1],int(parts[2]))
+    elif data.startswith("buyqty_prompt_"):
+        await prompt_equipment_quantity(update,context,data[len("buyqty_prompt_"):])
+    elif data.startswith("upgrade_equip_"):
+        await upgrade_equipment(update,context,data[len("upgrade_equip_"):])
+    elif data.startswith("model_"):
+        await query.answer("مدل انتخاب شد؛ برای خرید تعداد از دکمه خرید استفاده کنید.",show_alert=True)
     elif data.startswith("buy_") and data != "buy_vip":
         item_key = data[4:]
         await buy_equipment(update, context, item_key)
@@ -4181,6 +4170,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await execute_project(update, context, "shelter", 1000)
     elif data == "project_army":
         await execute_project(update, context, "army", 400)
+    elif data == "oil_build_well":
+        await oil_building_action(update, context, "oil_well")
+    elif data == "oil_build_rig":
+        await oil_building_action(update, context, "oil_rig")
+    elif data == "collect_oil":
+        await collect_oil(update, context)
     elif data == "buy_vip":
         await buy_vip(update, context)
     elif data == "vip_panel":
@@ -4233,6 +4228,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await clan_create(update, context)
     elif data == "clan_list":
         await clan_list(update, context)
+    elif data.startswith("clan_join_"):
+        await clan_join(update, context, data[len("clan_join_"):])
     elif data == "clan_members":
         await clan_members(update, context)
     elif data == "clan_leave":
@@ -4314,6 +4311,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await collect_research(update, context)
     elif data == "nuke_factory_menu":
         await nuke_factory_menu(update, context)
+    elif data == "collect_nuke_materials":
+        await collect_nuke_materials(update, context)
     elif data == "upgrade_factory":
         await upgrade_factory(update, context)
     elif data == "security_terror":
@@ -4392,6 +4391,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await admin_remove_admin_action(update, context, target_id)
     else:
         await query.edit_message_text("❌ این گزینه در حال توسعه است.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]]))
+
+async def buy_equipment_quantity_from_message(update, context, item_key, amount):
+    user=get_user(update.effective_user.id); info=ALL_EQUIPMENT.get(item_key)
+    if not info or amount<=0 or amount>100000:
+        await update.message.reply_text('❌ تعداد نامعتبر است!'); return
+    level=equipment_level_info(user,item_key); unit=int(info['price']*(1+(level-1)*0.10)); total=unit*amount
+    if user['gold']<total:
+        await update.message.reply_text(f'❌ طلای کافی ندارید! نیاز: {total:,}'); return
+    equip=user['equipment'].copy(); equip[item_key]=equip.get(item_key,0)+amount
+    update_user(update.effective_user.id,gold=user['gold']-total,equipment=equip)
+    await update.message.reply_text(f'✅ {amount} عدد {info["name"]} خریداری شد.\n💰 هزینه: {total:,} طلا')
 
 # ========== Text Handler ==========
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4494,7 +4504,9 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 damage = int(target["gold"] * 0.2)
                 update_user(user_id, gold=user["gold"] - cost)
                 update_user(target_id, gold=max(0, target["gold"] - damage))
-                await update.message.reply_text(f"🗡️ ترور موفق!\n💰 {damage:,} طلا به {target['country_name']} آسیب زدید.")
+                fine=max(5000,int(user["gold"]*0.05))
+                apply_un_penalty(user_id,"نقض حقوق بشر/ترور",fine,15)
+                await update.message.reply_text(f"🗡️ ترور موفق!\n💰 {damage:,} طلا به {target['country_name']} آسیب زدید.\n🌐 جریمه سازمان ملل: {fine:,} طلا")
                 try:
                     await context.bot.send_message(target_id, f"🗡️ ترور نافرجام!\n💰 {damage:,} طلا از دست دادید!")
                 except:
@@ -4514,6 +4526,15 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             await update.message.reply_text("❌ عدد معتبر وارد کنید!")
         context.user_data['waiting_for'] = None
+    elif waiting == 'equipment_quantity':
+        try:
+            amount=int(update.message.text.strip())
+            item_key=context.user_data.get('equipment_key')
+            context.user_data['waiting_for']=None
+            await buy_equipment_quantity_from_message(update,context,item_key,amount)
+        except Exception:
+            await update.message.reply_text('❌ فقط یک عدد معتبر وارد کنید!')
+        return
     elif waiting == 'bank_withdraw':
         try:
             amount = int(update.message.text)
