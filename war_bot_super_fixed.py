@@ -309,6 +309,9 @@ for _new_off_dict in (AIRCRAFT, GROUND_VEHICLES, NAVAL_VEHICLES, MISSILES):
 for _new_def_dict in (DEFENSE_SYSTEMS,):
     _assign_power_by_price(_new_def_dict)
 
+ORIGINAL_OFFENSIVE_KEYS = list(OFFENSIVE_EQUIPMENT.keys())
+ORIGINAL_DEFENSIVE_KEYS = list(DEFENSIVE_EQUIPMENT.keys())
+
 OFFENSIVE_EQUIPMENT.update(AIRCRAFT)
 OFFENSIVE_EQUIPMENT.update(GROUND_VEHICLES)
 OFFENSIVE_EQUIPMENT.update(NAVAL_VEHICLES)
@@ -1955,7 +1958,7 @@ async def arms_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     keyboard = []
-    off_keys = list(OFFENSIVE_EQUIPMENT.keys())
+    off_keys = ORIGINAL_OFFENSIVE_KEYS
     for i in range(0, len(off_keys), 2):
         row = []
         for j in range(2):
@@ -1980,7 +1983,7 @@ async def defense_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("ابتدا /start کنید")
         return
     keyboard = []
-    def_keys = list(DEFENSIVE_EQUIPMENT.keys())
+    def_keys = ORIGINAL_DEFENSIVE_KEYS
     for i in range(0, len(def_keys), 2):
         row = []
         for j in range(2):
