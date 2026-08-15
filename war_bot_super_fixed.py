@@ -438,6 +438,38 @@ def get_mining_income(user):
 CITY_INCOME_COOLDOWN = 3600     # ۱ ساعت - جمع‌آوری درآمد ساختمان‌های شهر
 MINING_COLLECT_COOLDOWN = 3600  # ۱ ساعت - برداشت تولید معادن
 
+# ========== سیستم کاپ‌بندی (لیگ) ==========
+NEW_USER_COLUMNS.update({"cups": "INTEGER DEFAULT 0"})
+# آستانه‌ی حداقل کاپ برای هر لیگ (صعودی). زیر ۱۰۰ کاپ هنوز هیچ لیگی نداره.
+CUP_LEAGUES = [
+    (100, "🥉 برنز"),
+    (500, "🥈 نقره"),
+    (700, "🥇 طلایی"),
+    (1000, "💎 حرفه‌ای"),
+    (2000, "👑 دیکتاتور"),
+    (5000, "🏛️ امپراتور"),
+    (10000, "🏆 افسانه‌ای"),
+]
+
+def get_league_name(cups):
+    name = "🔰 بدون لیگ"
+    for threshold, league_name in CUP_LEAGUES:
+        if cups >= threshold:
+            name = league_name
+    return name
+
+def add_cups(user_id, delta):
+    user = get_user(user_id)
+    if not user:
+        return
+    new_cups = max(0, user.get("cups", 0) + delta)
+    update_user(user_id, cups=new_cups)
+    return new_cups
+
+def get_total_troops(user):
+    """مجموع تعداد همه‌ی نیروها/تجهیزات (تهاجمی + دفاعی)"""
+    return sum(int(v) for v in user.get("equipment", {}).values())
+
 async def city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -993,6 +1025,7 @@ def get_user(user_id):
         "last_mining_collect": int(raw.get("last_mining_collect") or 0),
         "stock_price": int(raw.get("stock_price") or 100),
         "last_treasure_time": int(raw.get("last_treasure_time") or 0),
+        "cups": int(raw.get("cups") or 0),
     }
 
 def get_all_users():
@@ -1878,6 +1911,9 @@ async def my_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         f"🏳️ {user['country_name']}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"{get_league_name(user.get('cups', 0))} | 🏆 کاپ: {user.get('cups', 0):,}\n"
+        f"🪖 مجموع نیروها: {get_total_troops(user):,}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
         f"💰 طلا: {user['gold']:,}\n"
         f"🛢️ نفت: {user['oil']:,}\n"
         f"🏦 بانک: {user.get('bank_gold', 0):,}\n"
@@ -2337,6 +2373,8 @@ async def resolve_delayed_attack(attack_id, app):
                    equipment=attacker_equip, last_attack_time=int(time.time()))
         update_user(defender_id, gold=new_defender_gold, oil=new_defender_oil, total_losses=defender["total_losses"]+1,
                    equipment=defender_equip)
+        add_cups(attacker_id, 30)
+        add_cups(defender_id, -20)
 
         add_attack_log(attacker_id, attacker["country_name"], defender_id, defender["country_name"], "پیروزی (کاربر)", gold_stolen, oil_stolen)
 
@@ -2379,6 +2417,8 @@ async def resolve_delayed_attack(attack_id, app):
         update_user(attacker_id, gold=max(0, attacker["gold"]-gold_lost), oil=max(0, attacker["oil"]-oil_lost),
                    total_losses=attacker["total_losses"]+1, equipment=attacker_equip, last_attack_time=int(time.time()))
         update_user(defender_id, equipment=defender_equip)
+        add_cups(attacker_id, -15)
+        add_cups(defender_id, 10)
 
         add_attack_log(attacker_id, attacker["country_name"], defender_id, defender["country_name"], "شکست (کاربر)", 0, 0)
 
@@ -3830,9 +3870,33 @@ async def rankings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         vip = " 👑" if row[4] else ""
         clan = f" [{row[5]}]" if row[5] else ""
         text += f"{medal} {row[0]}{vip}{clan}\n💰 طلا: {row[1]:,}\n🏆 پیروزی‌ها: {row[2]}\n🏭 اقتصاد: {row[3]}\n━━━━━━━━━━━━━━━━━━━━\n"
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]]))
+    text += f"\n"
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([
+        [InlineKeyboardButton("🏆 رتبه‌بندی لیگ (کاپ)", style="primary", callback_data="cup_rankings")],
+        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]
+    ]))
 
-# ========== شرط‌بندی ==========
+async def cup_rankings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    conn = db_connect()
+    c = conn.cursor()
+    c.execute('SELECT country_name, cups, is_vip, clan FROM users ORDER BY cups DESC LIMIT 10')
+    rows = c.fetchall()
+    conn.close()
+    if not rows:
+        await query.edit_message_text("❌ هیچ کاربری وجود ندارد")
+        return
+    text = "🏆 رتبه‌بندی لیگ (بر اساس کاپ)\n━━━━━━━━━━━━━━━━━━━━\n\n"
+    for i, row in enumerate(rows, 1):
+        medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
+        vip = " 👑" if row[2] else ""
+        clan = f" [{row[3]}]" if row[3] else ""
+        text += f"{medal} {row[0]}{vip}{clan}\n{get_league_name(row[1])} | 🏆 کاپ: {row[1]:,}\n━━━━━━━━━━━━━━━━━━━━\n"
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([
+        [InlineKeyboardButton("💰 رتبه‌بندی طلا", style="primary", callback_data="rankings")],
+        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]
+    ]))
 async def betting(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -4088,6 +4152,8 @@ async def receive_duel_opponent(update: Update, context: ContextTypes.DEFAULT_TY
         new_opponent_gold = opponent["gold"] - gold_win
         update_user(user_id, gold=new_gold, duel_wins=user["duel_wins"]+1)
         update_user(opponent_id, gold=new_opponent_gold, duel_losses=opponent["duel_losses"]+1)
+        add_cups(user_id, 25)
+        add_cups(opponent_id, -15)
         result_text = f"⚔️ نتیجه دوئل\n━━━━━━━━━━━━━━━━━━━━\n✅ {user['country_name']} پیروز شد!\n💰 برد: {gold_win:,} طلا\n⚔️ قدرت شما: {user_power}\n⚔️ قدرت حریف: {opponent_power}"
     else:
         gold_lost = int(user["gold"] * 0.1)
@@ -4095,6 +4161,8 @@ async def receive_duel_opponent(update: Update, context: ContextTypes.DEFAULT_TY
         new_opponent_gold = opponent["gold"] + gold_lost
         update_user(user_id, gold=new_gold, duel_losses=user["duel_losses"]+1)
         update_user(opponent_id, gold=new_opponent_gold, duel_wins=opponent["duel_wins"]+1)
+        add_cups(user_id, -15)
+        add_cups(opponent_id, 25)
         result_text = f"⚔️ نتیجه دوئل\n━━━━━━━━━━━━━━━━━━━━\n❌ {opponent['country_name']} پیروز شد!\n💸 طلای از دست رفته: {gold_lost:,}\n⚔️ قدرت شما: {user_power}\n⚔️ قدرت حریف: {opponent_power}"
     await update.message.reply_text(result_text)
     context.user_data['waiting_for'] = None
@@ -5269,6 +5337,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await war_map(update, context)
     elif data == "rankings":
         await rankings(update, context)
+    elif data == "cup_rankings":
+        await cup_rankings(update, context)
     elif data == "betting":
         await betting(update, context)
     elif data == "bet_1" or data == "bet_2":
