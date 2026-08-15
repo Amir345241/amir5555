@@ -118,6 +118,496 @@ NEW_USER_COLUMNS = {
 }
 DEFAULT_VIP_BUILDINGS = {"hospital":0,"factory":0,"refinery":0,"university":0,"airport":0,"shelter_advanced":0}
 
+# ========== بخش تسلیحات جدید (اضافه شده) ==========
+# هواپیماها و جنگنده‌ها
+AIRCRAFT = {
+    "wright_flyer": {"name": "🇺🇸 Wright Flyer", "year": 1903, "type": "آزمایشی", "price": 2000, "oil_cost": 10},
+    "fokker_ei": {"name": "🇩🇪 Fokker E.I", "year": 1915, "type": "جنگنده", "price": 5000, "oil_cost": 20},
+    "sopwith_camel": {"name": "🇬🇧 Sopwith Camel", "year": 1917, "type": "جنگنده", "price": 8000, "oil_cost": 25},
+    "fokker_dvii": {"name": "🇩🇪 Fokker D.VII", "year": 1918, "type": "جنگنده", "price": 10000, "oil_cost": 30},
+    "hawker_hurricane": {"name": "🇬🇧 Hawker Hurricane", "year": 1937, "type": "جنگنده", "price": 15000, "oil_cost": 40},
+    "bf109": {"name": "🇩🇪 Messerschmitt Bf 109", "year": 1937, "type": "جنگنده", "price": 18000, "oil_cost": 45},
+    "spitfire": {"name": "🇬🇧 Supermarine Spitfire", "year": 1938, "type": "جنگنده", "price": 20000, "oil_cost": 50},
+    "p51": {"name": "🇺🇸 P-51 Mustang", "year": 1940, "type": "جنگنده", "price": 22000, "oil_cost": 50},
+    "a6m_zero": {"name": "🇯🇵 Mitsubishi A6M Zero", "year": 1940, "type": "جنگنده", "price": 20000, "oil_cost": 45},
+    "me262": {"name": "🇩🇪 Messerschmitt Me 262", "year": 1944, "type": "جنگنده جت", "price": 35000, "oil_cost": 60},
+    "mig15": {"name": "🇷🇺 MiG-15", "year": 1947, "type": "جنگنده جت", "price": 40000, "oil_cost": 70},
+    "f86": {"name": "🇺🇸 F-86 Sabre", "year": 1947, "type": "جنگنده جت", "price": 45000, "oil_cost": 70},
+    "mig21": {"name": "🇷🇺 MiG-21", "year": 1959, "type": "جنگنده مافوق‌صوت", "price": 60000, "oil_cost": 80},
+    "f4_phantom": {"name": "🇺🇸 F-4 Phantom II", "year": 1958, "type": "جنگنده چندمنظوره", "price": 70000, "oil_cost": 90},
+    "mig25": {"name": "🇷🇺 MiG-25 Foxbat", "year": 1964, "type": "رهگیر", "price": 80000, "oil_cost": 100},
+    "f14": {"name": "🇺🇸 F-14 Tomcat", "year": 1970, "type": "جنگنده رهگیر", "price": 90000, "oil_cost": 110},
+    "f15": {"name": "🇺🇸 F-15 Eagle", "year": 1972, "type": "جنگنده برتری هوایی", "price": 100000, "oil_cost": 120},
+    "su27": {"name": "🇷🇺 Su-27 Flanker", "year": 1977, "type": "جنگنده برتری هوایی", "price": 110000, "oil_cost": 120},
+    "f16": {"name": "🇺🇸 F-16 Fighting Falcon", "year": 1974, "type": "جنگنده چندمنظوره", "price": 120000, "oil_cost": 130},
+    "mig29": {"name": "🇷🇺 MiG-29 Fulcrum", "year": 1977, "type": "جنگنده چندمنظوره", "price": 115000, "oil_cost": 125},
+    "eurofighter": {"name": "🇪🇺 Eurofighter Typhoon", "year": 1994, "type": "جنگنده چندمنظوره", "price": 150000, "oil_cost": 140},
+    "rafale": {"name": "🇫🇷 Dassault Rafale", "year": 1986, "type": "جنگنده چندمنظوره", "price": 160000, "oil_cost": 150},
+    "su57": {"name": "🇷🇺 Su-57", "year": 2010, "type": "جنگنده نسل پنجم", "price": 250000, "oil_cost": 180},
+    "f22": {"name": "🇺🇸 F-22 Raptor", "year": 1997, "type": "جنگنده نسل پنجم", "price": 300000, "oil_cost": 200},
+    "f35": {"name": "🇺🇸 F-35 Lightning II", "year": 2006, "type": "جنگنده نسل پنجم", "price": 350000, "oil_cost": 220},
+}
+
+# تانک‌ها و وسایل زمینی
+GROUND_VEHICLES = {
+    "mark_i": {"name": "🇬🇧 Mark I", "year": 1916, "type": "تانک", "price": 3000},
+    "renault_ft": {"name": "🇫🇷 Renault FT", "year": 1917, "type": "تانک سبک", "price": 5000},
+    "a7v": {"name": "🇩🇪 A7V", "year": 1918, "type": "تانک سنگین", "price": 8000},
+    "t18": {"name": "🇷🇺 T-18", "year": 1927, "type": "تانک سبک", "price": 6000},
+    "panzer_ii": {"name": "🇩🇪 Panzer II", "year": 1935, "type": "تانک سبک", "price": 10000},
+    "t34": {"name": "🇷🇺 T-34", "year": 1940, "type": "تانک متوسط", "price": 20000},
+    "m4_sherman": {"name": "🇺🇸 M4 Sherman", "year": 1942, "type": "تانک متوسط", "price": 22000},
+    "tiger_i": {"name": "🇩🇪 Tiger I", "year": 1942, "type": "تانک سنگین", "price": 35000},
+    "is2": {"name": "🇷🇺 IS-2", "year": 1943, "type": "تانک سنگین", "price": 30000},
+    "centurion": {"name": "🇬🇧 Centurion", "year": 1945, "type": "تانک اصلی میدان نبرد", "price": 40000},
+    "m47_patton": {"name": "🇺🇸 M47 Patton", "year": 1951, "type": "تانک اصلی میدان نبرد", "price": 45000},
+    "t54": {"name": "🇷🇺 T-54", "year": 1947, "type": "تانک اصلی میدان نبرد", "price": 42000},
+    "m60_patton": {"name": "🇺🇸 M60 Patton", "year": 1960, "type": "تانک اصلی میدان نبرد", "price": 55000},
+    "leopard_1": {"name": "🇩🇪 Leopard 1", "year": 1965, "type": "تانک اصلی میدان نبرد", "price": 60000},
+    "t72": {"name": "🇷🇺 T-72", "year": 1969, "type": "تانک اصلی میدان نبرد", "price": 70000},
+    "challenger_1": {"name": "🇬🇧 Challenger 1", "year": 1983, "type": "تانک اصلی میدان نبرد", "price": 85000},
+    "m1_abrams": {"name": "🇺🇸 M1 Abrams", "year": 1980, "type": "تانک اصلی میدان نبرد", "price": 90000},
+    "leopard_2": {"name": "🇩🇪 Leopard 2", "year": 1979, "type": "تانک اصلی میدان نبرد", "price": 95000},
+    "merkava_4": {"name": "🇮🇱 Merkava Mk.4", "year": 2004, "type": "تانک اصلی میدان نبرد", "price": 120000},
+    "type_10": {"name": "🇯🇵 Type 10", "year": 2010, "type": "تانک اصلی میدان نبرد", "price": 130000},
+    "k2_black_panther": {"name": "🇰🇷 K2 Black Panther", "year": 2014, "type": "تانک اصلی میدان نبرد", "price": 140000},
+    "leclerc_xlr": {"name": "🇫🇷 Leclerc XLR", "year": "مدرن", "type": "تانک اصلی میدان نبرد", "price": 150000},
+    "m1a2_sepv3": {"name": "🇺🇸 M1A2 SEPv3", "year": "مدرن", "type": "تانک اصلی میدان نبرد", "price": 160000},
+    "leopard_2a8": {"name": "🇩🇪 Leopard 2A8", "year": "مدرن", "type": "تانک اصلی میدان نبرد", "price": 170000},
+    "kf51_panther": {"name": "🇩🇪 KF51 Panther", "year": "نسل جدید", "type": "تانک نسل آینده", "price": 200000},
+}
+
+# وسایل دریایی
+NAVAL_VEHICLES = {
+    "hms_dreadnought": {"name": "🇬🇧 HMS Dreadnought", "year": 1906, "type": "نبردناو", "price": 50000, "oil_cost": 50},
+    "sms_nassau": {"name": "🇩🇪 SMS Nassau", "year": 1908, "type": "نبردناو", "price": 45000, "oil_cost": 45},
+    "uss_texas": {"name": "🇺🇸 USS Texas", "year": 1912, "type": "نبردناو", "price": 48000, "oil_cost": 48},
+    "hms_queen_elizabeth": {"name": "🇬🇧 HMS Queen Elizabeth", "year": 1913, "type": "نبردناو", "price": 55000, "oil_cost": 55},
+    "uss_arizona": {"name": "🇺🇸 USS Arizona", "year": 1915, "type": "نبردناو", "price": 52000, "oil_cost": 52},
+    "bismarck": {"name": "🇩🇪 Bismarck", "year": 1939, "type": "نبردناو", "price": 80000, "oil_cost": 80},
+    "yamato": {"name": "🇯🇵 Yamato", "year": 1940, "type": "نبردناو", "price": 90000, "oil_cost": 90},
+    "iowa_class": {"name": "🇺🇸 Iowa-class", "year": 1940, "type": "نبردناو", "price": 85000, "oil_cost": 85},
+    "uboat_vii": {"name": "🇩🇪 U-boat Type VII", "year": 1936, "type": "زیردریایی", "price": 40000, "oil_cost": 40},
+    "gato_class": {"name": "🇺🇸 Gato-class", "year": 1941, "type": "زیردریایی", "price": 45000, "oil_cost": 45},
+    "essex_class": {"name": "🇺🇸 Essex-class", "year": 1942, "type": "ناو هواپیمابر", "price": 100000, "oil_cost": 120},
+    "akagi": {"name": "🇯🇵 Akagi", "year": 1927, "type": "ناو هواپیمابر", "price": 90000, "oil_cost": 100},
+    "kirov_class": {"name": "🇷🇺 Kirov-class", "year": 1980, "type": "رزم‌ناو موشکی سنگین", "price": 150000, "oil_cost": 150},
+    "ticonderoga_class": {"name": "🇺🇸 Ticonderoga-class", "year": 1983, "type": "رزم‌ناو موشکی", "price": 140000, "oil_cost": 140},
+    "arleigh_burke": {"name": "🇺🇸 Arleigh Burke-class", "year": 1991, "type": "ناوشکن موشک‌انداز", "price": 160000, "oil_cost": 160},
+    "los_angeles": {"name": "🇺🇸 Los Angeles-class", "year": 1976, "type": "زیردریایی تهاجمی هسته‌ای", "price": 200000, "oil_cost": 200},
+    "seawolf": {"name": "🇺🇸 Seawolf-class", "year": 1997, "type": "زیردریایی تهاجمی هسته‌ای", "price": 250000, "oil_cost": 250},
+    "virginia": {"name": "🇺🇸 Virginia-class", "year": 2004, "type": "زیردریایی تهاجمی هسته‌ای", "price": 280000, "oil_cost": 280},
+    "zumwalt": {"name": "🇺🇸 Zumwalt-class", "year": 2016, "type": "ناوشکن موشک‌انداز", "price": 300000, "oil_cost": 300},
+    "queen_elizabeth_class": {"name": "🇬🇧 Queen Elizabeth-class", "year": 2017, "type": "ناو هواپیمابر", "price": 350000, "oil_cost": 350},
+    "fremm": {"name": "🇫🇷/🇮🇹 FREMM", "year": 2012, "type": "ناوچه چندمنظوره", "price": 180000, "oil_cost": 180},
+    "type_055": {"name": "🇨🇳 Type 055 Renhai-class", "year": 2020, "type": "ناوشکن/رزم‌ناو موشکی سنگین", "price": 320000, "oil_cost": 320},
+    "type_003": {"name": "🇨🇳 Type 003 Fujian", "year": 2022, "type": "ناو هواپیمابر", "price": 400000, "oil_cost": 400},
+    "ford_class": {"name": "🇺🇸 Gerald R. Ford-class", "year": 2017, "type": "ناو هواپیمابر هسته‌ای", "price": 500000, "oil_cost": 500},
+    "columbia_class": {"name": "🇺🇸 Columbia-class", "year": "نسل آینده", "type": "زیردریایی موشک بالستیک هسته‌ای", "price": 600000, "oil_cost": 600},
+}
+
+# موشک‌ها
+MISSILES = {
+    "v1": {"name": "🇩🇪 V-1", "year": 1944, "type": "موشک کروز اولیه", "price": 50000, "oil_cost": 30, "tech_req": 10},
+    "v2": {"name": "🇩🇪 V-2", "year": 1944, "type": "موشک بالستیک", "price": 60000, "oil_cost": 40, "tech_req": 15},
+    "r1": {"name": "🇷🇺 R-1", "year": 1950, "type": "موشک بالستیک کوتاه‌برد", "price": 70000, "oil_cost": 50, "tech_req": 20},
+    "r5": {"name": "🇷🇺 R-5", "year": 1956, "type": "موشک بالستیک میان‌برد", "price": 90000, "oil_cost": 60, "tech_req": 25},
+    "scud_b": {"name": "🇷🇺 Scud-B", "year": 1961, "type": "موشک بالستیک کوتاه‌برد", "price": 80000, "oil_cost": 55, "tech_req": 25},
+    "polaris_a1": {"name": "🇺🇸 Polaris A-1", "year": 1960, "type": "موشک بالستیک زیردریایی‌پرتاب", "price": 120000, "oil_cost": 80, "tech_req": 30},
+    "minuteman_i": {"name": "🇺🇸 Minuteman I", "year": 1962, "type": "موشک بالستیک قاره‌پیما", "price": 150000, "oil_cost": 100, "tech_req": 35},
+    "pershing_ii": {"name": "🇺🇸 Pershing II", "year": 1983, "type": "موشک بالستیک", "price": 130000, "oil_cost": 90, "tech_req": 40},
+    "tomahawk": {"name": "🇺🇸 Tomahawk", "year": 1983, "type": "موشک کروز", "price": 100000, "oil_cost": 70, "tech_req": 35},
+    "harpoon": {"name": "🇺🇸 Harpoon", "year": 1977, "type": "موشک ضدکشتی", "price": 110000, "oil_cost": 75, "tech_req": 30},
+    "exocet": {"name": "🇫🇷 Exocet", "year": 1975, "type": "موشک ضدکشتی", "price": 115000, "oil_cost": 78, "tech_req": 30},
+    "patriot": {"name": "🇺🇸 Patriot", "year": 1984, "type": "موشک پدافندی", "price": 140000, "oil_cost": 95, "tech_req": 40},
+    "trident_ii": {"name": "🇺🇸/🇬🇧 Trident II D5", "year": 1990, "type": "موشک بالستیک زیردریایی‌پرتاب", "price": 200000, "oil_cost": 150, "tech_req": 50},
+    "iskander_m": {"name": "🇷🇺 Iskander-M", "year": 2006, "type": "موشک بالستیک کوتاه‌برد", "price": 180000, "oil_cost": 130, "tech_req": 45},
+    "kalibr": {"name": "🇷🇺 Kalibr", "year": 2010, "type": "موشک کروز", "price": 160000, "oil_cost": 120, "tech_req": 45},
+    "brahmos": {"name": "🇮🇳/🇷🇺 BrahMos", "year": 2006, "type": "موشک کروز مافوق‌صوت", "price": 190000, "oil_cost": 140, "tech_req": 50},
+    "storm_shadow": {"name": "🇬🇧/🇫🇷 Storm Shadow", "year": 2003, "type": "موشک کروز", "price": 170000, "oil_cost": 125, "tech_req": 45},
+    "jassm": {"name": "🇺🇸 JASSM", "year": 2009, "type": "موشک کروز هواپرتاب", "price": 185000, "oil_cost": 135, "tech_req": 48},
+    "df21d": {"name": "🇨🇳 DF-21D", "year": 2010, "type": "موشک بالستیک ضدکشتی", "price": 220000, "oil_cost": 160, "tech_req": 55},
+    "fateh110": {"name": "🇮🇷 Fateh-110", "year": 2002, "type": "موشک بالستیک کوتاه‌برد", "price": 130000, "oil_cost": 85, "tech_req": 35},
+    "zircon": {"name": "🇷🇺 Zircon (3M22)", "year": "2020s", "type": "موشک کروز هایپرسونیک", "price": 300000, "oil_cost": 250, "tech_req": 70},
+    "agm183": {"name": "🇺🇸 AGM-183 ARRW", "year": "برنامه هایپرسونیک", "type": "موشک هواپرتاب", "price": 350000, "oil_cost": 280, "tech_req": 75},
+    "prsm": {"name": "🇺🇸 PrSM", "year": "2020s", "type": "موشک بالستیک تاکتیکی", "price": 250000, "oil_cost": 200, "tech_req": 60},
+    "lrhw": {"name": "🇺🇸 LRHW / Dark Eagle", "year": "2020s", "type": "سلاح هایپرسونیک", "price": 400000, "oil_cost": 300, "tech_req": 80},
+    "avangard": {"name": "🇷🇺 Avangard", "year": 2019, "type": "گلایدِر هایپرسونیک قاره‌پیما", "price": 500000, "oil_cost": 350, "tech_req": 85},
+}
+
+# بمب‌های هسته‌ای (فقط با مواد هسته‌ای + فناوری)
+NUCLEAR_BOMBS = {
+    "little_boy": {"name": "🇺🇸 Little Boy", "year": 1945, "type": "بمب شکافت هسته‌ای اورانیومی",
+                   "nuke_cost": 50, "tech_req": 40, "steal_pct": 10, "destroy_pct": 15, "un_penalty": 20},
+    "fat_man": {"name": "🇺🇸 Fat Man", "year": 1945, "type": "بمب شکافت هسته‌ای پلوتونیومی",
+                "nuke_cost": 60, "tech_req": 45, "steal_pct": 20, "destroy_pct": 20, "un_penalty": 25},
+    "ivy_mike": {"name": "🇺🇸 Ivy Mike", "year": 1952, "type": "نخستین بمب گرماهسته‌ای (هیدروژنی)",
+                 "nuke_cost": 80, "tech_req": 55, "steal_pct": 30, "destroy_pct": 35, "un_penalty": 35},
+    "tsar_bomba": {"name": "🇷🇺 Tsar Bomba", "year": 1961, "type": "بزرگ‌ترین بمب هسته‌ای تاریخ",
+                   "nuke_cost": 150, "tech_req": 70, "steal_pct": 50, "destroy_pct": 40, "un_penalty": 50},
+    "b83": {"name": "🇺🇸 B83", "year": 1983, "type": "بمب گرماهسته‌ای مدرن با قدرت متغیر",
+            "nuke_cost": 100, "tech_req": 60, "steal_pct": 60, "destroy_pct": 0, "un_penalty": 40},
+}
+
+# پدافندها
+DEFENSE_SYSTEMS = {
+    "s75": {"name": "🇷🇺 S-75", "type": "پدافند هوایی", "price": 50000, "oil_cost": 20, "tech_req": 20},
+    "hawk": {"name": "🇺🇸 HAWK", "type": "پدافند هوایی", "price": 70000, "oil_cost": 30, "tech_req": 25},
+    "s300": {"name": "🇷🇺 S-300", "type": "پدافند هوایی پیشرفته", "price": 150000, "oil_cost": 60, "tech_req": 40},
+    "s400": {"name": "🇷🇺 S-400", "type": "پدافند هوایی دوربرد", "price": 250000, "oil_cost": 100, "tech_req": 50},
+    "patriot_system": {"name": "🇺🇸 Patriot", "type": "پدافند موشکی", "price": 200000, "oil_cost": 80, "tech_req": 45},
+    "samp_t": {"name": "🇪🇺 SAMP/T", "type": "پدافند هوایی", "price": 220000, "oil_cost": 90, "tech_req": 48},
+    "iron_dome": {"name": "🇮🇱 Iron Dome", "type": "پدافند کوتاه‌برد", "price": 100000, "oil_cost": 40, "tech_req": 30},
+    "thaad": {"name": "🇺🇸 THAAD", "type": "پدافند بالستیک", "price": 300000, "oil_cost": 120, "tech_req": 55},
+    "davids_sling": {"name": "🇮🇱 David's Sling", "type": "پدافند میان‌برد", "price": 180000, "oil_cost": 70, "tech_req": 42},
+    "arrow_3": {"name": "🇮🇱 Arrow 3", "type": "پدافند دوربرد بالستیک", "price": 350000, "oil_cost": 140, "tech_req": 60},
+}
+
+# ========== سیستم شهرسازی ==========
+CITY_BUILDINGS = {
+    "housing": {"name": "🏠 مسکن", "cost": 5000, "income": 700, "max": 2000, "repair_cost_pct": 0.1},
+    "hospital": {"name": "🏥 بیمارستان", "cost": 100000, "income": 5000, "max": 200, "repair_cost_pct": 0.15},
+    "market": {"name": "🏪 بازار", "cost": 10000, "income": 600, "max": 100, "repair_cost_pct": 0.1},
+    "tower": {"name": "🏗️ برج", "cost": 1000000, "income": 50000, "max": 10, "repair_cost_pct": 0.2},
+    "hotel": {"name": "🏨 هتل", "cost": 20000, "income": 1000, "max": 50, "repair_cost_pct": 0.12},
+    "bank": {"name": "🏦 بانک", "cost": 100000, "income": 5000, "max": 15, "repair_cost_pct": 0.15},
+}
+
+# ========== سیستم معدن ==========
+MINING_BUILDINGS = {
+    "oil_refinery": {"name": "🛢️ پالایشگاه نفت", "cost": 1000000, "income_oil": 1000, "max": 50},
+    "gold_mine": {"name": "⛏️ معدن طلا", "cost": 500000, "income_gold": 25000, "max": 20},
+    "uranium_mine": {"name": "☢️ معدن اورانیوم", "cost": 10000000, "income_nuke": 100, "max": 10},
+}
+
+# ستون‌های جدید مربوط به شهرسازی/معدن/شکار گنج - قبل از init_db() اضافه می‌شوند
+# تا در همون اجرای اول از طریق مهاجرت (migration) به دیتابیس اضافه شوند.
+NEW_USER_COLUMNS.update({
+    "city_buildings": "TEXT DEFAULT '{}'",
+    "city_buildings_health": "TEXT DEFAULT '{}'",
+    "mining_buildings": "TEXT DEFAULT '{}'",
+    "last_city_income": "INTEGER DEFAULT 0",
+    "last_mining_collect": "INTEGER DEFAULT 0",
+    "stock_price": "INTEGER DEFAULT 100",
+    "last_treasure_time": "INTEGER DEFAULT 0",
+})
+
+# ========== ادغام تسلیحات جدید در سیستم تسلیحات/جنگ موجود ==========
+# سیستم موجود بازی (بازار تسلیحات، ارتقا، محاسبه‌ی قدرت حمله/دفاع) به‌صورت
+# جنریک روی OFFENSIVE_EQUIPMENT / DEFENSIVE_EQUIPMENT کار می‌کنه و هر آیتم
+# باید کلید "power" داشته باشه. آیتم‌های جدید فقط "price" دارن، پس اینجا
+# یک "power" متناسب با قیمتشون بهشون می‌دیم (تقریباً هم‌تراز آیتم‌های قدیمی)
+# و بعد داخل همون دیکشنری‌های اصلی ادغام می‌کنیم تا همه‌ی امکانات موجود
+# (بازار، ارتقا، مدل‌ها، محاسبه قدرت در نبرد) خودکار روشون کار کنه.
+def _assign_power_by_price(d, divisor=1000):
+    for item in d.values():
+        if "power" not in item:
+            item["power"] = max(1, round(item.get("price", 1000) / divisor))
+
+for _new_off_dict in (AIRCRAFT, GROUND_VEHICLES, NAVAL_VEHICLES, MISSILES):
+    _assign_power_by_price(_new_off_dict)
+for _new_def_dict in (DEFENSE_SYSTEMS,):
+    _assign_power_by_price(_new_def_dict)
+
+OFFENSIVE_EQUIPMENT.update(AIRCRAFT)
+OFFENSIVE_EQUIPMENT.update(GROUND_VEHICLES)
+OFFENSIVE_EQUIPMENT.update(NAVAL_VEHICLES)
+OFFENSIVE_EQUIPMENT.update(MISSILES)
+DEFENSIVE_EQUIPMENT.update(DEFENSE_SYSTEMS)
+
+# ALL_EQUIPMENT / DEFAULT_EQUIPMENT باید بعد از ادغام بالا دوباره ساخته بشن
+# چون بار اول (بالای فایل) قبل از این ادغام محاسبه شده بودن.
+ALL_EQUIPMENT = {**OFFENSIVE_EQUIPMENT, **DEFENSIVE_EQUIPMENT}
+DEFAULT_EQUIPMENT = {k: 0 for k in ALL_EQUIPMENT.keys()}
+
+# برای اینکه دکمه‌ی «بازگشت» در پنل هر تجهیزات به بازارِ درستش برگرده،
+# دسته‌بندی هر آیتم رو نگه می‌داریم (بازار تسلیحات قدیمی همچنان جدا می‌مونه).
+EQUIPMENT_MARKET_OF = {}
+for _k in AIRCRAFT: EQUIPMENT_MARKET_OF[_k] = "aircraft_market"
+for _k in GROUND_VEHICLES: EQUIPMENT_MARKET_OF[_k] = "ground_market"
+for _k in NAVAL_VEHICLES: EQUIPMENT_MARKET_OF[_k] = "naval_market"
+for _k in MISSILES: EQUIPMENT_MARKET_OF[_k] = "missile_market"
+for _k in DEFENSE_SYSTEMS: EQUIPMENT_MARKET_OF[_k] = "defense_systems_market"
+
+def get_equipment_back_market(item_key):
+    if item_key in EQUIPMENT_MARKET_OF:
+        return EQUIPMENT_MARKET_OF[item_key]
+    return "defense_market" if item_key in DEFENSIVE_EQUIPMENT else "arms_market"
+
+EQUIPMENT_PAGE_SIZE = 8  # تعداد آیتم در هر صفحه از بازارهای جدید (برای جلوگیری از کیبورد خیلی بزرگ)
+
+def build_paged_market_keyboard(items_dict, market_key, page, back_callback):
+    keys = list(items_dict.keys())
+    total_pages = max(1, (len(keys) + EQUIPMENT_PAGE_SIZE - 1) // EQUIPMENT_PAGE_SIZE)
+    page = max(0, min(page, total_pages - 1))
+    start = page * EQUIPMENT_PAGE_SIZE
+    page_keys = keys[start:start + EQUIPMENT_PAGE_SIZE]
+    keyboard = []
+    for i in range(0, len(page_keys), 2):
+        row = []
+        for j in range(2):
+            if i + j < len(page_keys):
+                key = page_keys[i + j]
+                row.append(InlineKeyboardButton(items_dict[key]["name"], style="primary", callback_data=f"equip_panel_{key}"))
+        keyboard.append(row)
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton("⬅️ قبلی", style="primary", callback_data=f"{market_key}_page_{page-1}"))
+    if page < total_pages - 1:
+        nav_row.append(InlineKeyboardButton("➡️ بعدی", style="primary", callback_data=f"{market_key}_page_{page+1}"))
+    if nav_row:
+        keyboard.append(nav_row)
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data=back_callback)])
+    return InlineKeyboardMarkup(keyboard), page, total_pages
+
+async def show_new_weapons_market(update, context, items_dict, market_key, title, back_callback, page=0):
+    query = update.callback_query
+    await query.answer()
+    kb, page, total_pages = build_paged_market_keyboard(items_dict, market_key, page, back_callback)
+    await query.edit_message_text(f"{title}\n\n📄 صفحه {page+1}/{total_pages}\nهر وسیله را انتخاب کنید تا خرید و ارتقا را ببینید.", reply_markup=kb)
+
+async def aircraft_market(update, context, page=0):
+    await show_new_weapons_market(update, context, AIRCRAFT, "aircraft_market", "✈️ بازار هواپیماها و جنگنده‌ها", "arms_market", page)
+
+async def ground_market(update, context, page=0):
+    await show_new_weapons_market(update, context, GROUND_VEHICLES, "ground_market", "🚜 بازار تانک‌ها و وسایل زمینی", "arms_market", page)
+
+async def naval_market(update, context, page=0):
+    await show_new_weapons_market(update, context, NAVAL_VEHICLES, "naval_market", "🚢 بازار وسایل دریایی", "arms_market", page)
+
+async def missile_market(update, context, page=0):
+    await show_new_weapons_market(update, context, MISSILES, "missile_market", "🚀 بازار موشک‌ها", "arms_market", page)
+
+async def defense_systems_market(update, context, page=0):
+    await show_new_weapons_market(update, context, DEFENSE_SYSTEMS, "defense_systems_market", "🎯 بازار سامانه‌های پدافندی", "defense_market", page)
+
+# ========== توابع کمکی شهرسازی ==========
+def get_city_buildings(user):
+    """دریافت ساختمان‌های شهر کاربر"""
+    buildings = user.get("city_buildings", {}) or {}
+    health = user.get("city_buildings_health", {}) or {}
+    return buildings, health
+
+def get_city_income(user):
+    """محاسبه درآمد ساعتی شهر"""
+    buildings, _ = get_city_buildings(user)
+    total = 0
+    for key, data in CITY_BUILDINGS.items():
+        total += buildings.get(key, 0) * data["income"]
+    return total
+
+def repair_city_buildings(user_id, building_type=None):
+    """تعمیر ساختمان‌های آسیب‌دیده"""
+    user = get_user(user_id)
+    buildings, health = get_city_buildings(user)
+    total_cost = 0
+
+    if building_type:
+        if health.get(building_type, 100) < 100:
+            damage = 100 - health.get(building_type, 100)
+            cost = int(damage * CITY_BUILDINGS[building_type]["repair_cost_pct"] * buildings.get(building_type, 0))
+            health[building_type] = 100
+            total_cost += cost
+    else:
+        for key, h in health.items():
+            if h < 100 and buildings.get(key, 0) > 0:
+                damage = 100 - h
+                cost = int(damage * CITY_BUILDINGS[key]["repair_cost_pct"] * buildings.get(key, 0))
+                health[key] = 100
+                total_cost += cost
+
+    update_user(user_id, city_buildings_health=json.dumps(health))
+    return total_cost
+
+# ========== توابع کمکی معدن ==========
+def get_mining_buildings(user):
+    return user.get("mining_buildings", {}) or {}
+
+def get_mining_income(user):
+    """محاسبه تولید ساعتی معادن"""
+    buildings = get_mining_buildings(user)
+    return {
+        "oil": buildings.get("oil_refinery", 0) * 1000,
+        "gold": buildings.get("gold_mine", 0) * 25000,
+        "nuke": buildings.get("uranium_mine", 0) * 100,
+    }
+
+CITY_INCOME_COOLDOWN = 3600     # ۱ ساعت - جمع‌آوری درآمد ساختمان‌های شهر
+MINING_COLLECT_COOLDOWN = 3600  # ۱ ساعت - برداشت تولید معادن
+
+async def city_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    user = get_user(user_id)
+    if not user:
+        await query.edit_message_text("ابتدا /start کنید")
+        return
+    buildings, health = get_city_buildings(user)
+    income = get_city_income(user)
+    now = int(time.time())
+    last = user.get("last_city_income", 0)
+    remaining = max(0, CITY_INCOME_COOLDOWN - (now - last))
+
+    text = f"🏙️ شهرسازی\n━━━━━━━━━━━━━━━━━━━━\n💰 طلا: {user['gold']:,}\n💵 درآمد ساعتی فعلی: {income:,} طلا\n\n"
+    keyboard = []
+    for key, data in CITY_BUILDINGS.items():
+        count = buildings.get(key, 0)
+        h = health.get(key, 100)
+        text += f"{data['name']} — تعداد: {count}/{data['max']} | سلامت: {h}%\n"
+        keyboard.append([InlineKeyboardButton(f"{data['name']} ➕ ({data['cost']:,} طلا)", style="success", callback_data=f"city_build_{key}")])
+
+    if remaining == 0:
+        text += "\n✅ درآمد آماده‌ی برداشت است!"
+        keyboard.append([InlineKeyboardButton(f"💰 برداشت درآمد ({income:,} طلا)", style="success", callback_data="city_collect_income")])
+    else:
+        text += f"\n⏳ تا برداشت بعدی درآمد: {format_time_remaining(remaining)}"
+
+    damaged_cost = repair_cost_preview(user)
+    if damaged_cost > 0:
+        keyboard.append([InlineKeyboardButton(f"🛠️ تعمیر همه ({damaged_cost:,} طلا)", style="primary", callback_data="city_repair_all")])
+
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="economic_menu")])
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+def repair_cost_preview(user):
+    buildings, health = get_city_buildings(user)
+    total = 0
+    for key, h in health.items():
+        if h < 100 and buildings.get(key, 0) > 0:
+            damage = 100 - h
+            total += int(damage * CITY_BUILDINGS[key]["repair_cost_pct"] * buildings.get(key, 0))
+    return total
+
+async def city_build(update: Update, context: ContextTypes.DEFAULT_TYPE, key):
+    query = update.callback_query
+    user_id = query.from_user.id
+    user = get_user(user_id)
+    if key not in CITY_BUILDINGS:
+        await query.answer("❌ ساختمان نامعتبر است!", show_alert=True); return
+    buildings, health = get_city_buildings(user)
+    data = CITY_BUILDINGS[key]
+    if buildings.get(key, 0) >= data["max"]:
+        await query.answer("❌ به حداکثر تعداد این ساختمان رسیده‌اید!", show_alert=True); return
+    if user["gold"] < data["cost"]:
+        await query.answer(f"❌ طلای کافی ندارید! نیاز: {data['cost']:,}", show_alert=True); return
+    buildings[key] = buildings.get(key, 0) + 1
+    health[key] = 100
+    update_user(user_id, gold=user["gold"] - data["cost"], city_buildings=json.dumps(buildings), city_buildings_health=json.dumps(health))
+    await query.answer(f"✅ {data['name']} ساخته شد!", show_alert=True)
+    await city_menu(update, context)
+
+async def city_collect_income(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    user = get_user(user_id)
+    now = int(time.time())
+    last = user.get("last_city_income", 0)
+    if now - last < CITY_INCOME_COOLDOWN:
+        remaining = CITY_INCOME_COOLDOWN - (now - last)
+        await query.answer(f"⏳ {format_time_remaining(remaining)} صبر کنید!", show_alert=True); return
+    income = get_city_income(user)
+    update_user(user_id, gold=user["gold"] + income, last_city_income=now)
+    await query.answer(f"✅ {income:,} طلا دریافت شد!", show_alert=True)
+    await city_menu(update, context)
+
+async def city_repair_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    user = get_user(user_id)
+    cost = repair_cost_preview(user)
+    if cost <= 0:
+        await query.answer("✅ نیازی به تعمیر نیست!", show_alert=True); return
+    if user["gold"] < cost:
+        await query.answer(f"❌ طلای کافی ندارید! نیاز: {cost:,}", show_alert=True); return
+    update_user(user_id, gold=user["gold"] - cost)
+    total_cost = repair_city_buildings(user_id)
+    await query.answer(f"🛠️ تعمیرات با هزینه‌ی {total_cost:,} طلا انجام شد!", show_alert=True)
+    await city_menu(update, context)
+
+async def new_mining_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    user = get_user(user_id)
+    if not user:
+        await query.edit_message_text("ابتدا /start کنید")
+        return
+    buildings = get_mining_buildings(user)
+    income = get_mining_income(user)
+    now = int(time.time())
+    last = user.get("last_mining_collect", 0)
+    remaining = max(0, MINING_COLLECT_COOLDOWN - (now - last))
+
+    text = f"⛏️ معادن\n━━━━━━━━━━━━━━━━━━━━\n💰 طلا: {user['gold']:,}\n\n"
+    keyboard = []
+    for key, data in MINING_BUILDINGS.items():
+        count = buildings.get(key, 0)
+        text += f"{data['name']} — تعداد: {count}/{data['max']}\n"
+        keyboard.append([InlineKeyboardButton(f"{data['name']} ➕ ({data['cost']:,} طلا)", style="success", callback_data=f"mining_build_{key}")])
+
+    text += f"\n🛢️ نفت/ساعت: {income['oil']:,} | 💰 طلا/ساعت: {income['gold']:,} | ☢️ مواد هسته‌ای/ساعت: {income['nuke']}\n"
+    if remaining == 0:
+        keyboard.append([InlineKeyboardButton("📦 برداشت تولید معادن", style="success", callback_data="mining_collect_new")])
+        text += "\n✅ تولید آماده‌ی برداشت است!"
+    else:
+        text += f"\n⏳ تا برداشت بعدی: {format_time_remaining(remaining)}"
+
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="economic_menu")])
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def mining_build(update: Update, context: ContextTypes.DEFAULT_TYPE, key):
+    query = update.callback_query
+    user_id = query.from_user.id
+    user = get_user(user_id)
+    if key not in MINING_BUILDINGS:
+        await query.answer("❌ معدن نامعتبر است!", show_alert=True); return
+    buildings = get_mining_buildings(user)
+    data = MINING_BUILDINGS[key]
+    if buildings.get(key, 0) >= data["max"]:
+        await query.answer("❌ به حداکثر تعداد این معدن رسیده‌اید!", show_alert=True); return
+    if user["gold"] < data["cost"]:
+        await query.answer(f"❌ طلای کافی ندارید! نیاز: {data['cost']:,}", show_alert=True); return
+    buildings[key] = buildings.get(key, 0) + 1
+    update_user(user_id, gold=user["gold"] - data["cost"], mining_buildings=json.dumps(buildings))
+    await query.answer(f"✅ {data['name']} ساخته شد!", show_alert=True)
+    await new_mining_menu(update, context)
+
+async def mining_collect_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    user = get_user(user_id)
+    now = int(time.time())
+    last = user.get("last_mining_collect", 0)
+    if now - last < MINING_COLLECT_COOLDOWN:
+        remaining = MINING_COLLECT_COOLDOWN - (now - last)
+        await query.answer(f"⏳ {format_time_remaining(remaining)} صبر کنید!", show_alert=True); return
+    income = get_mining_income(user)
+    update_user(user_id, gold=user["gold"] + income["gold"], oil=user["oil"] + income["oil"],
+                nuke_materials=user.get("nuke_materials", 0) + income["nuke"], last_mining_collect=now)
+    await query.answer(f"✅ {income['gold']:,} طلا | {income['oil']:,} نفت | {income['nuke']} ماده هسته‌ای دریافت شد!", show_alert=True)
+    await new_mining_menu(update, context)
+
+# ========== توابع کمکی حمله انتخابی ==========
+def calculate_selective_attack_power(user, selected_units):
+    """محاسبه قدرت حمله بر اساس واحدهای انتخاب‌شده (هواپیما/تانک/ناوی/موشک/بمب هسته‌ای)"""
+    power = 0
+    for unit_key, count in selected_units.items():
+        if unit_key in AIRCRAFT:
+            power += count * 15 * (1 + (user["tech"] / 100))
+        elif unit_key in GROUND_VEHICLES:
+            power += count * 10 * (1 + (user["tech"] / 100))
+        elif unit_key in NAVAL_VEHICLES:
+            power += count * 12 * (1 + (user["tech"] / 100))
+        elif unit_key in MISSILES:
+            power += count * 25 * (1 + (user["tech"] / 100))
+        elif unit_key in NUCLEAR_BOMBS:
+            power += count * 50 * (1 + (user["tech"] / 100))
+    return power
+
+# کول‌داون شکار گنج (رفع باگ: قبلاً هیچ تایمری نداشت و می‌شد پشت سر هم بی‌نهایت شکار کرد)
+TREASURE_COOLDOWN = 3600  # ۱ ساعت
+
 def init_db():
     conn = db_connect()
     c = conn.cursor()
@@ -493,6 +983,13 @@ def get_user(user_id):
         "oil_buildings": jload(raw.get("oil_buildings"), {"oil_well": 0, "oil_rig": 0}),
         "oil_last_collect": int(raw.get("oil_last_collect") or 0),
         "last_group_attack": int(raw.get("last_group_attack") or 0),
+        "city_buildings": jload(raw.get("city_buildings"), {}),
+        "city_buildings_health": jload(raw.get("city_buildings_health"), {}),
+        "mining_buildings": jload(raw.get("mining_buildings"), {}),
+        "last_city_income": int(raw.get("last_city_income") or 0),
+        "last_mining_collect": int(raw.get("last_mining_collect") or 0),
+        "stock_price": int(raw.get("stock_price") or 100),
+        "last_treasure_time": int(raw.get("last_treasure_time") or 0),
     }
 
 def get_all_users():
@@ -1166,6 +1663,8 @@ def get_economic_menu(user):
          InlineKeyboardButton("🏦 بانک", style="primary", callback_data="bank_menu")],
         [InlineKeyboardButton("⛏️ معدن‌کاوی", style="primary", callback_data="mining"),
          InlineKeyboardButton("📈 بازار سهام", style="primary", callback_data="stock_market")],
+        [InlineKeyboardButton("🏙️ شهرسازی", style="primary", callback_data="city_menu"),
+         InlineKeyboardButton("⛏️ معادن جدید", style="primary", callback_data="new_mining_menu")],
         [InlineKeyboardButton("🏗️ پروژه‌های ملی", style="primary", callback_data="national_projects"),
          InlineKeyboardButton("🏴 بازار سیاه", style="danger", callback_data="black_market")],
         [InlineKeyboardButton("💰 انتقال طلا", style="primary", callback_data="transfer_gold"),
@@ -1465,6 +1964,10 @@ async def arms_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 info = OFFENSIVE_EQUIPMENT[key]
                 row.append(InlineKeyboardButton(info["name"], style="primary", callback_data=f"equip_panel_{key}"))
         keyboard.append(row)
+    keyboard.append([InlineKeyboardButton("✈️ هواپیما", style="primary", callback_data="aircraft_market"),
+                      InlineKeyboardButton("🚜 تانک و زمینی", style="primary", callback_data="ground_market")])
+    keyboard.append([InlineKeyboardButton("🚢 دریایی", style="primary", callback_data="naval_market"),
+                      InlineKeyboardButton("🚀 موشک", style="primary", callback_data="missile_market")])
     keyboard.append([InlineKeyboardButton("➡️ سلاح‌های دفاعی", style="primary", callback_data="defense_market")])
     keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")])
     await query.edit_message_text("🛒 بازار تسلیحات جنگی\n\nهر وسیله را انتخاب کنید تا مدل‌ها، تعداد خرید و ارتقا را ببینید.", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -1485,6 +1988,7 @@ async def defense_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 key = def_keys[i+j]
                 row.append(InlineKeyboardButton(DEFENSIVE_EQUIPMENT[key]["name"], style="primary", callback_data=f"equip_panel_{key}"))
         keyboard.append(row)
+    keyboard.append([InlineKeyboardButton("🎯 سامانه‌های پدافندی جدید", style="primary", callback_data="defense_systems_market")])
     keyboard.append([InlineKeyboardButton("⬅️ سلاح‌های جنگی", style="primary", callback_data="arms_market")])
     keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="military_menu")])
     await query.edit_message_text("🛡️ بازار تسلیحات دفاعی\n\nهر وسیله را انتخاب کنید تا مدل‌ها، تعداد خرید و ارتقا را ببینید.", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -1510,7 +2014,7 @@ async def equipment_panel(update: Update, context: ContextTypes.DEFAULT_TYPE, it
         mark = "✅ " if idx == selected_model else ""
         owned_variant = int(variants.get(str(idx), 0))
         kb.insert(1, [InlineKeyboardButton(f"{mark}{model} • مدل {idx} • موجودی {owned_variant}", style="success" if idx == selected_model else "primary", callback_data=f"model_{item_key}_{idx}")])
-    back = "defense_market" if item_key in DEFENSIVE_EQUIPMENT else "arms_market"
+    back = get_equipment_back_market(item_key)
     kb.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data=back)])
     await query.edit_message_text(f"{info['name']}\n━━━━━━━━━━━━━━━━━━━━\n📦 موجودی: {owned}\n📈 سطح: {level}\n💰 قیمت پایه: {info['price']:,} طلا\n\nمدل موردنظر را انتخاب کنید یا تعداد خرید را وارد کنید:", reply_markup=InlineKeyboardMarkup(kb))
 
@@ -3911,6 +4415,14 @@ async def treasure_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user:
         await query.edit_message_text("ابتدا /start کنید")
         return
+    # رفع باگ: قبلاً هیچ تایمری روی شکار گنج نبود و می‌شد پشت سر هم بی‌نهایت شکار کرد.
+    now = int(time.time())
+    last_treasure = user.get("last_treasure_time", 0)
+    if now - last_treasure < TREASURE_COOLDOWN:
+        remaining = TREASURE_COOLDOWN - (now - last_treasure)
+        await query.answer(f"⏳ {format_time_remaining(remaining)} تا شکار گنج بعدی!", show_alert=True)
+        return
+    update_user(user_id, last_treasure_time=now)
     treasure = get_active_treasure()
     if not treasure:
         create_treasure()
@@ -4557,10 +5069,44 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await arms_market(update, context)
     elif data == "defense_market":
         await defense_market(update, context)
+    elif data == "aircraft_market":
+        await aircraft_market(update, context)
+    elif data.startswith("aircraft_market_page_"):
+        await aircraft_market(update, context, int(data.rsplit("_", 1)[1]))
+    elif data == "ground_market":
+        await ground_market(update, context)
+    elif data.startswith("ground_market_page_"):
+        await ground_market(update, context, int(data.rsplit("_", 1)[1]))
+    elif data == "naval_market":
+        await naval_market(update, context)
+    elif data.startswith("naval_market_page_"):
+        await naval_market(update, context, int(data.rsplit("_", 1)[1]))
+    elif data == "missile_market":
+        await missile_market(update, context)
+    elif data.startswith("missile_market_page_"):
+        await missile_market(update, context, int(data.rsplit("_", 1)[1]))
+    elif data == "defense_systems_market":
+        await defense_systems_market(update, context)
+    elif data.startswith("defense_systems_market_page_"):
+        await defense_systems_market(update, context, int(data.rsplit("_", 1)[1]))
+    elif data == "city_menu":
+        await city_menu(update, context)
+    elif data.startswith("city_build_"):
+        await city_build(update, context, data[len("city_build_"):])
+    elif data == "city_collect_income":
+        await city_collect_income(update, context)
+    elif data == "city_repair_all":
+        await city_repair_all(update, context)
+    elif data == "new_mining_menu":
+        await new_mining_menu(update, context)
+    elif data.startswith("mining_build_"):
+        await mining_build(update, context, data[len("mining_build_"):])
+    elif data == "mining_collect_new":
+        await mining_collect_new(update, context)
     elif data.startswith("equip_panel_"):
         await equipment_panel(update, context, data[len("equip_panel_"):])
     elif data.startswith("buyqty_") and not data.startswith("buyqty_prompt_"):
-        parts=data.split("_"); await buy_equipment_quantity(update,context,parts[1],int(parts[2]))
+        parts=data.split("_"); item_key="_".join(parts[1:-1]); await buy_equipment_quantity(update,context,item_key,int(parts[-1]))
     elif data.startswith("buyqty_prompt_"):
         await prompt_equipment_quantity(update,context,data[len("buyqty_prompt_"):])
     elif data.startswith("upgrade_equip_"):
