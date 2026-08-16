@@ -6751,7 +6751,7 @@ async def start_with_referral(update: Update, context: ContextTypes.DEFAULT_TYPE
                 update_user(referrer_id, equipment=equip)
                 update_user(user_id, referred_by=referrer_id, gold=1200)
                 try:
-                    await context.bot.send_message(referrer_id, f"🎉 {update.effective_user.first_name} با لینک شما عضو شد!\n💰 ۵۰۰ طلا | 🛢️ ۲۰۰ نفت | 🪖 ۲ سرباز")
+                    await context.bot.send_message(referrer_id, f"🎉 {update.effective_user.first_name} با لینک شما عضو شد!\n💰 ۵۰۰۰۰ طلا | 🛢️ ۲۰۰۰۰ نفت | 🪖 ۲۰۰ سرباز")
                 except:
                     pass
         except:
