@@ -625,6 +625,91 @@ async def mining_collect_new(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer(f"✅ {income['gold']:,} طلا | {income['oil']:,} نفت | {income['nuke']} ماده هسته‌ای دریافت شد!", show_alert=True)
     await new_mining_menu(update, context)
 
+# ========== فروشگاه محصولات (خرید با طلا) ==========
+async def shop_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    user = get_user(user_id)
+    if not user:
+        await query.edit_message_text("ابتدا /start کنید")
+        return
+    products = get_products(active_only=True)
+    text = f"🛒 فروشگاه محصولات\n━━━━━━━━━━━━━━━━━━━━\n💰 طلای شما: {user['gold']:,}\n\n"
+    keyboard = []
+    if not products:
+        text += "فعلاً محصولی برای فروش ثبت نشده."
+    else:
+        text += "یک محصول را برای مشاهده و خرید انتخاب کنید:"
+        for p in products:
+            keyboard.append([InlineKeyboardButton(f"{p['name']} — {p['price']:,} طلا", style="primary", callback_data=f"shop_view_{p['id']}")])
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")])
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def shop_view_product(update: Update, context: ContextTypes.DEFAULT_TYPE, product_id):
+    query = update.callback_query
+    await query.answer()
+    product = get_product(product_id)
+    if not product or not product["active"]:
+        await query.answer("❌ این محصول دیگر موجود نیست!", show_alert=True)
+        await shop_menu(update, context)
+        return
+    text = f"🛒 {product['name']}\n━━━━━━━━━━━━━━━━━━━━\n💰 قیمت: {product['price']:,} طلا\n"
+    if product["content_text"]:
+        text += f"\n📝 توضیحات:\n{product['content_text']}\n"
+    keyboard = [
+        [InlineKeyboardButton(f"✅ خرید ({product['price']:,} طلا)", style="success", callback_data=f"shop_buy_{product['id']}")],
+        [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="shop_menu")]
+    ]
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def shop_buy_product(update: Update, context: ContextTypes.DEFAULT_TYPE, product_id):
+    query = update.callback_query
+    user_id = query.from_user.id
+    user = get_user(user_id)
+    product = get_product(product_id)
+    if not product or not product["active"]:
+        await query.answer("❌ این محصول دیگر موجود نیست!", show_alert=True)
+        await shop_menu(update, context)
+        return
+    if user["gold"] < product["price"]:
+        await query.answer(f"❌ طلای کافی ندارید! نیاز: {product['price']:,}", show_alert=True)
+        return
+    update_user(user_id, gold=user["gold"] - product["price"])
+    log_product_purchase(product["id"], user_id, user["country_name"], product["price"])
+
+    # ارسال محتوای محصول (متن/لینک/فایل) به خریدار
+    delivery = f"✅ خرید موفق: {product['name']}\n━━━━━━━━━━━━━━━━━━━━\n"
+    if product["content_text"]:
+        delivery += f"{product['content_text']}\n"
+    if product["content_link"]:
+        delivery += f"🔗 {product['content_link']}\n"
+    await query.answer("✅ خرید با موفقیت انجام شد!", show_alert=True)
+    try:
+        await context.bot.send_message(chat_id=user_id, text=delivery)
+    except Exception:
+        pass
+    if product["file_id"]:
+        try:
+            await context.bot.send_document(chat_id=user_id, document=product["file_id"], filename=product.get("file_name") or None)
+        except Exception:
+            pass
+
+    # اطلاع به همه‌ی ادمین‌ها برای پیگیری/تحویل دستی (مثلاً شارژ تلفن)
+    admin_notice = (
+        f"🛒 خرید جدید محصول\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"📦 محصول: {product['name']}\n"
+        f"💰 قیمت: {product['price']:,} طلا\n"
+        f"👤 خریدار: {user['country_name']} (آیدی: {user_id})\n"
+    )
+    for admin_id in ADMIN_IDS:
+        try:
+            await context.bot.send_message(chat_id=admin_id, text=admin_notice)
+        except Exception:
+            pass
+
+    await shop_menu(update, context)
+
 # ========== توابع کمکی حمله انتخابی ==========
 def calculate_selective_attack_power(user, selected_units):
     """محاسبه قدرت حمله بر اساس واحدهای انتخاب‌شده (هواپیما/تانک/ناوی/موشک/بمب هسته‌ای)"""
@@ -881,6 +966,32 @@ def init_db():
             text TEXT,
             created_at INTEGER,
             is_read BOOLEAN DEFAULT 0
+        )
+    ''')
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            price INTEGER,
+            content_text TEXT,
+            content_link TEXT,
+            file_id TEXT,
+            file_name TEXT,
+            active INTEGER DEFAULT 1,
+            created_by INTEGER,
+            created_at INTEGER
+        )
+    ''')
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS product_purchases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER,
+            user_id INTEGER,
+            country_name TEXT,
+            price INTEGER,
+            created_at INTEGER
         )
     ''')
 
@@ -1211,6 +1322,62 @@ def add_transfer_log(sender_id, sender_name, receiver_id, receiver_name, amount)
     c = conn.cursor()
     c.execute('INSERT INTO transfers (sender_id, sender_name, receiver_id, receiver_name, amount, timestamp) VALUES (?, ?, ?, ?, ?, ?)',
               (sender_id, sender_name, receiver_id, receiver_name, amount, int(time.time())))
+    conn.commit()
+    conn.close()
+
+# ========== محصولات (خرید محصولات با طلا) ==========
+def add_product(name, price, content_text, content_link, file_id, file_name, created_by):
+    conn = db_connect()
+    c = conn.cursor()
+    c.execute('INSERT INTO products (name, price, content_text, content_link, file_id, file_name, active, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)',
+              (name, price, content_text, content_link, file_id, file_name, created_by, int(time.time())))
+    conn.commit()
+    pid = c.lastrowid
+    conn.close()
+    return pid
+
+def get_products(active_only=True):
+    conn = db_connect()
+    c = conn.cursor()
+    if active_only:
+        c.execute('SELECT id, name, price, content_text, content_link, file_id, file_name, active FROM products WHERE active=1 ORDER BY id DESC')
+    else:
+        c.execute('SELECT id, name, price, content_text, content_link, file_id, file_name, active FROM products ORDER BY id DESC')
+    rows = c.fetchall()
+    conn.close()
+    keys = ["id", "name", "price", "content_text", "content_link", "file_id", "file_name", "active"]
+    return [dict(zip(keys, row)) for row in rows]
+
+def get_product(product_id):
+    conn = db_connect()
+    c = conn.cursor()
+    c.execute('SELECT id, name, price, content_text, content_link, file_id, file_name, active FROM products WHERE id=?', (product_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return None
+    keys = ["id", "name", "price", "content_text", "content_link", "file_id", "file_name", "active"]
+    return dict(zip(keys, row))
+
+def delete_product(product_id):
+    conn = db_connect()
+    c = conn.cursor()
+    c.execute('DELETE FROM products WHERE id=?', (product_id,))
+    conn.commit()
+    conn.close()
+
+def toggle_product_active(product_id):
+    conn = db_connect()
+    c = conn.cursor()
+    c.execute('UPDATE products SET active = 1 - active WHERE id=?', (product_id,))
+    conn.commit()
+    conn.close()
+
+def log_product_purchase(product_id, user_id, country_name, price):
+    conn = db_connect()
+    c = conn.cursor()
+    c.execute('INSERT INTO product_purchases (product_id, user_id, country_name, price, created_at) VALUES (?, ?, ?, ?, ?)',
+              (product_id, user_id, country_name, price, int(time.time())))
     conn.commit()
     conn.close()
 
@@ -1665,12 +1832,12 @@ def format_casualties(losses):
 
 # ========== دکمه‌های منوی دسته‌بندی‌شده ==========
 def get_main_menu(user):
-    # منوی اصلی عمداً فقط سه بخش دارد؛ هیچ قابلیت قدیمی حذف نشده است.
-    # «دعوت دوستان» تنها دکمه‌ای است که طبق درخواست کاربر خارج از این سه بخش می‌ماند.
+    # منوی اصلی: سه بخش اصلی + دعوت دوستان + خرید محصولات (فروشگاه با طلا)
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🏛 سیاسی", style="primary", callback_data="political_menu"),
          InlineKeyboardButton("💰 اقتصادی", style="primary", callback_data="economic_menu"),
          InlineKeyboardButton("⚔️ نظامی", style="primary", callback_data="military_menu")],
+        [InlineKeyboardButton("🛒 خرید محصولات", style="success", callback_data="shop_menu")],
         [InlineKeyboardButton("👥 دعوت دوستان", style="success", callback_data="referral")],
     ])
 
@@ -5176,6 +5343,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await mining_build(update, context, data[len("mining_build_"):])
     elif data == "mining_collect_new":
         await mining_collect_new(update, context)
+    elif data == "shop_menu":
+        await shop_menu(update, context)
+    elif data.startswith("shop_view_"):
+        await shop_view_product(update, context, int(data[len("shop_view_"):]))
+    elif data.startswith("shop_buy_"):
+        await shop_buy_product(update, context, int(data[len("shop_buy_"):]))
+    elif data == "admin_products":
+        await admin_products(update, context)
+    elif data == "admin_add_product":
+        await admin_add_product(update, context)
+    elif data.startswith("admin_toggle_product_"):
+        await admin_toggle_product(update, context, int(data[len("admin_toggle_product_"):]))
+    elif data.startswith("admin_del_product_"):
+        await admin_delete_product(update, context, int(data[len("admin_del_product_"):]))
     elif data.startswith("equip_panel_"):
         await equipment_panel(update, context, data[len("equip_panel_"):])
     elif data.startswith("buyqty_") and not data.startswith("buyqty_prompt_"):
@@ -5781,6 +5962,16 @@ async def admin_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         conn.close()
         await update.message.reply_text(f"✅ کشور {name} اضافه شد!")
         context.user_data['waiting_for'] = None
+    elif waiting == 'admin_product_name':
+        await receive_admin_product_name(update, context)
+    elif waiting == 'admin_product_price':
+        await receive_admin_product_price(update, context)
+    elif waiting == 'admin_product_text':
+        await receive_admin_product_text(update, context)
+    elif waiting == 'admin_product_link':
+        await receive_admin_product_link(update, context)
+    elif waiting == 'admin_product_file':
+        await receive_admin_product_file(update, context)
     elif waiting == 'admin_add_channel':
         raw = update.message.text.strip()
         # هم فرمت ساده (فقط @channel) و هم فرمت قدیمی (آیدی | نام | لینک) پشتیبانی می‌شود
@@ -5957,6 +6148,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("➕ افزودن ادمین", style="success", callback_data="admin_add_admin"),
          InlineKeyboardButton("📋 لیست ادمین‌ها", style="primary", callback_data="admin_list_admins")],
         [InlineKeyboardButton("📣 پیام همگانی", style="primary", callback_data="admin_broadcast")],
+        [InlineKeyboardButton("🛒 مدیریت خرید محصولات", style="primary", callback_data="admin_products")],
         [InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]
     ]
     text = (f"👑 پنل مدیریت\n━━━━━━━━━━━━━━━━━━━━\n👥 کاربران: {len(users)}\n🤖 NPC ها: {len(npcs)}\n📢 کانال‌ها: {len(channels)}\n━━━━━━━━━━━━━━━━━━━━\n📋 انتخاب کنید:")
@@ -6047,6 +6239,114 @@ async def admin_remove_channel(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
     await query.edit_message_text("❌ آیدی کانال را برای حذف وارد کنید:", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="admin_channels")]]))
     context.user_data['waiting_for'] = 'admin_remove_channel'
+
+# ========== مدیریت خرید محصولات (ادمین) ==========
+async def admin_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        await query.answer("🚫 دسترسی ندارید!", show_alert=True); return
+    products = get_products(active_only=False)
+    text = "🛒 مدیریت خرید محصولات\n━━━━━━━━━━━━━━━━━━━━\n\n"
+    keyboard = []
+    if not products:
+        text += "هنوز محصولی ثبت نشده.\n"
+    else:
+        for p in products:
+            status = "✅ فعال" if p["active"] else "⛔️ غیرفعال"
+            text += f"#{p['id']} {p['name']} — {p['price']:,} طلا ({status})\n"
+            keyboard.append([
+                InlineKeyboardButton(f"✏️ #{p['id']}", style="primary", callback_data=f"admin_toggle_product_{p['id']}"),
+                InlineKeyboardButton(f"❌ حذف #{p['id']}", style="danger", callback_data=f"admin_del_product_{p['id']}")
+            ])
+    keyboard.append([InlineKeyboardButton("➕ افزودن محصول جدید", style="success", callback_data="admin_add_product")])
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="admin")])
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def admin_toggle_product(update: Update, context: ContextTypes.DEFAULT_TYPE, product_id):
+    query = update.callback_query
+    if not is_admin(query.from_user.id):
+        await query.answer("🚫 دسترسی ندارید!", show_alert=True); return
+    toggle_product_active(product_id)
+    await query.answer("✅ وضعیت محصول تغییر کرد!")
+    await admin_products(update, context)
+
+async def admin_delete_product(update: Update, context: ContextTypes.DEFAULT_TYPE, product_id):
+    query = update.callback_query
+    if not is_admin(query.from_user.id):
+        await query.answer("🚫 دسترسی ندارید!", show_alert=True); return
+    delete_product(product_id)
+    await query.answer("🗑️ محصول حذف شد!")
+    await admin_products(update, context)
+
+async def admin_add_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(query.from_user.id):
+        await query.answer("🚫 دسترسی ندارید!", show_alert=True); return
+    context.user_data['new_product'] = {}
+    await query.edit_message_text(
+        "➕ افزودن محصول جدید\n━━━━━━━━━━━━━━━━━━━━\nنام محصول را بفرست (مثلاً: شارژ ۱۰ تومنی):",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 انصراف", style="primary", callback_data="admin_products")]]))
+    context.user_data['waiting_for'] = 'admin_product_name'
+
+async def receive_admin_product_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    name = update.message.text.strip()
+    if not name:
+        await update.message.reply_text("❌ نام معتبر وارد کنید!")
+        return
+    context.user_data['new_product']['name'] = name
+    await update.message.reply_text("💰 حالا قیمت محصول را به طلا وارد کنید (مثلاً: 200000):")
+    context.user_data['waiting_for'] = 'admin_product_price'
+
+async def receive_admin_product_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        price = int(update.message.text.strip().replace(",", ""))
+        if price <= 0:
+            raise ValueError
+    except ValueError:
+        await update.message.reply_text("❌ یک عدد صحیح و مثبت وارد کنید!")
+        return
+    context.user_data['new_product']['price'] = price
+    await update.message.reply_text(
+        "📝 متن/توضیحات محصول را بفرست (چیزی که بعد از خرید به کاربر نشون داده میشه).\n"
+        "اگه توضیحی نیست، بنویس: ندارد")
+    context.user_data['waiting_for'] = 'admin_product_text'
+
+async def receive_admin_product_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    context.user_data['new_product']['content_text'] = "" if text in ("ندارد", "-", "skip") else text
+    await update.message.reply_text("🔗 لینکی هست که بعد از خرید نشون داده بشه؟ بفرست، یا بنویس: ندارد")
+    context.user_data['waiting_for'] = 'admin_product_link'
+
+async def receive_admin_product_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    link = update.message.text.strip()
+    context.user_data['new_product']['content_link'] = "" if link in ("ندارد", "-", "skip") else link
+    await update.message.reply_text("📎 اگه فایلی هست که باید بعد از خرید ارسال بشه، همینجا بفرستش. اگه فایلی نیست، بنویس: ندارد")
+    context.user_data['waiting_for'] = 'admin_product_file'
+
+async def finalize_new_product(update: Update, context: ContextTypes.DEFAULT_TYPE, file_id=None, file_name=None):
+    np = context.user_data.get('new_product', {})
+    pid = add_product(
+        np.get('name', 'محصول بدون نام'),
+        np.get('price', 0),
+        np.get('content_text', ''),
+        np.get('content_link', ''),
+        file_id,
+        file_name,
+        update.effective_user.id
+    )
+    context.user_data['new_product'] = None
+    context.user_data['waiting_for'] = None
+    await update.message.reply_text(
+        f"✅ محصول «{np.get('name')}» با قیمت {np.get('price', 0):,} طلا ثبت شد! (#{pid})\n"
+        f"از منوی «🛒 خرید محصولات» توسط کاربران قابل خریده."
+    )
+
+async def receive_admin_product_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = (update.message.text or "").strip()
+    if text in ("ندارد", "-", "skip"):
+        await finalize_new_product(update, context)
 
 async def admin_coupons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -6225,6 +6525,12 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user_id = update.effective_user.id
     waiting = context.user_data.get('waiting_for')
+    if waiting == 'admin_product_file':
+        if not is_admin(user_id):
+            return
+        doc = update.message.document
+        await finalize_new_product(update, context, file_id=doc.file_id if doc else None, file_name=doc.file_name if doc else None)
+        return
     if waiting != 'admin_upload_db':
         return
     if not is_admin(user_id):
