@@ -303,6 +303,8 @@ def _assign_power_by_price(d, divisor=1000):
     for item in d.values():
         if "power" not in item:
             item["power"] = max(1, round(item.get("price", 1000) / divisor))
+        if "flag" not in item:
+            item["flag"] = ""
 
 for _new_off_dict in (AIRCRAFT, GROUND_VEHICLES, NAVAL_VEHICLES, MISSILES):
     _assign_power_by_price(_new_off_dict)
@@ -1657,7 +1659,7 @@ def format_casualties(losses):
             if i + j < len(items):
                 key, count = items[i+j]
                 info = ALL_EQUIPMENT.get(key, {"name": key, "flag": ""})
-                line += f"• {info['flag']} {info['name']} ×{count}   "
+                line += f"• {info.get('flag','')} {info['name']} ×{count}   "
         lines.append(line.strip())
     return "\n".join(lines)
 
