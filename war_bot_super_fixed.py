@@ -5867,7 +5867,9 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['waiting_for'] = None
     elif waiting in ['admin_gold', 'admin_oil', 'admin_vip', 'admin_ban', 'admin_add_country',
                      'admin_add_channel', 'admin_remove_channel', 'admin_create_coupon',
-                     'admin_global_gold', 'admin_global_oil', 'admin_add_admin', 'admin_broadcast']:
+                     'admin_global_gold', 'admin_global_oil', 'admin_add_admin', 'admin_broadcast',
+                     'admin_product_name', 'admin_product_price', 'admin_product_text',
+                     'admin_product_link', 'admin_product_file']:
         await admin_text_handler(update, context)
     else:
         await update.message.reply_text("برای دیدن منو /start را بزنید.")
