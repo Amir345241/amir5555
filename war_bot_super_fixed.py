@@ -4728,7 +4728,7 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_username = context.bot.username
     link = f"https://t.me/{bot_username}?start={user_id}"
     await query.edit_message_text(
-        f"👥 دعوت دوستان\n━━━━━━━━━━━━━━━━━━━━\n📊 تعداد دعوت شده: {user.get('referrals', 0)}\n\n🔗 لینک دعوت شما:\n{link}\n\n🎁 به ازای هر دوست:\n• 💰 ۵۰۰ طلا\n• 🛢️ ۲۰۰ نفت\n• 🪖 ۲ سرباز\n\n📤 لینک را برای دوستانتان بفرستید!",
+        f"👥 دعوت دوستان\n━━━━━━━━━━━━━━━━━━━━\n📊 تعداد دعوت شده: {user.get('referrals', 0)}\n\n🔗 لینک دعوت شما:\n{link}\n\n🎁 به ازای هر دوست:\n• 💰 ۵۰۰۰۰ طلا\n• 🛢️ ۲۰۰۰۰ نفت\n• 🪖 ۲۰۰ سرباز\n\n📤 لینک را برای دوستانتان بفرستید!",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", style="primary", callback_data="menu")]])
     )
 
